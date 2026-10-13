@@ -321,3 +321,9 @@ PDF 对应规则类别 1。默认配置在 RVA `0x116C4` 分配并清零；初�
 已停止主机上的新宿主执行测试。`run_alternate_host_tests.py` 移除了 workflow 执行计划与选项，并要求显式选择其余宿主，默认不再执行任何宿主。工作流相关源码仅保留为静态分析证据。后续此类行为风险较高的研究应转到隔离虚拟机，保持防护启用并记录拦截结果。
 
 告警证据为 `research/evidence/defender-host-experiment-events.json` 与 `defender-workflow-threat-detection.json`。新增原生宿主 DLL 通过默认关闭的 CMake 选项 `DFA_BUILD_HOST_PROBES` 构建；所有实验仍受当前系统 DLL 精确指纹与固定 PDF 目标限制。
+
+## 2026-10-14：无需研究宿主的正常流程分析
+
+后台静态分析定位了 Windows.UI.AppDefaults.dll 中的扩展名设置项和 PDF 快捷设置实现。单扩展名入口通过 OpenWithLauncher 本地 COM 服务器启动系统选择界面，本机注册服务器是 OpenWith.exe；PDF 快捷动作另有同源 UserAssocSet/新 Hash 写入链。UCPD 一个受功能条件选择的分支检查实际当前写入进程，没有找到向自有 EXE 转移直接写入信任的授权步骤。
+
+本轮未操作界面、启动上述系统选择组件或修改 PDF 默认关联，未把私有函数在自有 EXE 中执行。正常确认后的实际 writer 和内核放行分支仍需 VM 运行时证据。完整路径、公开接口限制和可能的原生能力边界见 [原生 EXE 与正常默认关联流程](native-default-association-flow.md)。

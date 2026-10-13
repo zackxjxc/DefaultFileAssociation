@@ -40,6 +40,7 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--functions", nargs="*", default=[])
+    parser.add_argument("--string-pattern", help="Override the default relevant-string regex")
     options = parser.parse_args()
     binary = options.binary.resolve()
     project = Path(__file__).resolve().parents[2]
@@ -66,7 +67,7 @@ def main():
             ida_nalt.enum_import_names(module, imported)
         strings = idautils.Strings()
         strings.setup(strtypes=[ida_nalt.STRTYPE_C, ida_nalt.STRTYPE_C_16], minlen=4)
-        pattern = re.compile(r"UserChoice|HashVersion|AppDefault|mshta|OriginalFile|StackTrace|RegCallback|Certificate|AllowList|DenyList|FeatureV|ProgId", re.I)
+        pattern = re.compile(options.string_pattern or r"UserChoice|HashVersion|AppDefault|mshta|OriginalFile|StackTrace|RegCallback|Certificate|AllowList|DenyList|FeatureV|ProgId", re.I)
         selected_strings = []
         candidate_functions = set()
         for value in strings:
@@ -108,6 +109,10 @@ def main():
                         {"ea": hex(target), "name": ida_name.get_name(target)} for target in targets]})
             basename = f"{ea:x}_{record['name']}"
             basename = re.sub(r"[^A-Za-z0-9_.-]", "_", basename)
+            # Public PDBs can supply decorated C++ names beyond Windows path limits.
+            # The address prefix remains unique when the descriptive suffix is shortened.
+            basename = basename[:120]
+            record["export_basename"] = basename
             (options.output / f"{basename}.asm.txt").write_text("\n".join(assembly) + "\n", encoding="utf-8", newline="\n")
             if decompiler:
                 try:
