@@ -16,6 +16,7 @@ sources = {
     "libdocbox.dll": root / "test_case/libdocbox.dll",
     "012.pdf": root / "test_case/012.pdf",
     "test-msbuild-package.ps1": root / "test_case/test-msbuild-package.ps1",
+    "test-msbuild-menu.bat": root / "test_case/test-msbuild-menu.bat",
     "README.md": root / "docs/msbuild-vm-test-package.md",
 }
 payloads = {name: path.read_bytes() for name, path in sources.items()}

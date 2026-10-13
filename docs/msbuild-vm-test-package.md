@@ -8,6 +8,10 @@ DefaultFileAssociation.exe 是 x86 入口，64 位 Windows 上自动使用系统
 
 先给 VM 建快照，保持 Defender 和 UCPD 正常运行。将整个 ZIP 解压到 VM 本地一个固定目录，例如 `C:\DFA Test`，保留阅读器 DLL 和 PDF 样本。
 
+双击 **test-msbuild-menu.bat**，按 **1** 兼容性预检、**2** 设置、**3** 只读复查，按 **0** 退出。无需输入命令。每次运行显示结果和报告路径，按任意键回到菜单；普通双击即可。
+
+下面的命令行方式作为可选用法：
+
 在该目录打开普通用户 PowerShell，先检查兼容性：
 
 ```powershell
