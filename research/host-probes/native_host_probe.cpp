@@ -19,7 +19,8 @@ extern "C" HRESULT WINAPI DllRegisterServer() {
         }
         const auto name = std::filesystem::path(host.data()).filename().wstring();
         if (!dfa::platform::EqualsInsensitive(name, L"odbcconf.exe") &&
-            !dfa::platform::EqualsInsensitive(name, L"regsvr32.exe")) return E_ACCESSDENIED;
+            !dfa::platform::EqualsInsensitive(name, L"regsvr32.exe") &&
+            !dfa::platform::EqualsInsensitive(name, L"msiexec.exe")) return E_ACCESSDENIED;
         const std::wstring operation(mode.data());
         if (operation != L"read" && operation != L"write") return E_INVALIDARG;
         const std::filesystem::path log_path(report.data());

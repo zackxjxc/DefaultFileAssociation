@@ -207,8 +207,9 @@ Defender and record both association results and security detections.
 
 See the [research checkpoint](docs/research-checkpoint-20261013.md) for confirmed
 results, hypotheses, and limits, and the [VM memory capture plan](docs/ucpd-vm-memory-capture-plan.md)
-for a future way to inspect loaded policy. That capture plan has not yet been
-executed. Raw evidence, system binaries, tools, memory dumps, and reader samples
+for ways to inspect loaded policy. The supplied host live dump has now yielded
+the runtime PDF lists; see [live dump and alternate hosts](docs/livedump-and-alternatives-20261014.md)
+for the msiexec switch test and public MakeDefault result. Raw evidence, system binaries, tools, memory dumps, and reader samples
 are kept locally and excluded from Git.
 
 ## Source layout

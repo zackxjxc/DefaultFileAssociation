@@ -79,8 +79,11 @@ option(DFA_BUILD_HOST_PROBES "Build the controlled PDF association host experime
 if(DFA_BUILD_HOST_PROBES)
     add_library(PdfAssociationHostProbe SHARED research/host-probes/native_host_probe.cpp research/host-probes/native_host_probe.def)
     target_link_libraries(PdfAssociationHostProbe PRIVATE dfa_core)
+    add_executable(PdfAssociationApiProbe research/native-probes/assoc_handler_probe.cpp)
+    target_link_libraries(PdfAssociationApiProbe PRIVATE shell32 ole32)
     if(MSVC)
         target_compile_options(PdfAssociationHostProbe PRIVATE /W4 /permissive- /utf-8)
+        target_compile_options(PdfAssociationApiProbe PRIVATE /W4 /permissive- /utf-8)
     endif()
 endif()
 
