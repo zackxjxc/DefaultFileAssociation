@@ -23,6 +23,8 @@ struct ParserData {
     bool check = false;
     bool diagnose = false;
     bool latest_native_probe = false;
+    bool msbuild = false;
+    bool preflight = false;
     std::string experiment = "default";
     std::string log_file;
 };
@@ -53,6 +55,8 @@ void Configure(CLI::App& app, ParserData& data) {
     app.add_flag("--diagnose", data.diagnose, "Collect read-only registry and Shell diagnostics.");
     app.add_flag("--latest-native-probe", data.latest_native_probe,
                  "Build-specific x64 PDF experiment using an existing ProgID; --check performs read-only validation.");
+    app.add_flag("--msbuild", data.msbuild, "Use the embedded Framework64 MSBuild new-format PDF backend.");
+    app.add_flag("--preflight", data.preflight, "With --msbuild, check compatibility without registering or setting defaults.");
     app.add_option("--log-file", data.log_file, "Append UTF-8 output and diagnostic snapshots to this file.");
     app.add_option("--experiment", data.experiment,
                    "VM comparison: default (toasts), none, toasts, notify, or toasts-notify.")
@@ -125,6 +129,17 @@ std::wstring Validate(Options& options) {
     if (!options.prog_id.empty() && !IsValidProgId(options.prog_id)) {
         return L"--prog-id must be at most 255 characters using letters, digits, '.', '-' and '_'.";
     }
+    if (options.preflight && (!options.msbuild || options.check || options.diagnose || options.dry_run)) {
+        return L"--preflight requires --msbuild and cannot be combined with other operation modes.";
+    }
+    if (options.msbuild) {
+        if (options.extension != L".pdf" || options.latest_native_probe || options.diagnose ||
+            (options.experiment != "default" && options.experiment != "none")) {
+            return L"--msbuild currently supports only --ext=.pdf, without native probe, diagnosis or experiments.";
+        }
+        options.use_hta = false;
+        if (!options.check && !options.preflight && !options.icon_index && options.icon_path.empty()) options.icon_index = 1;
+    }
     if ((options.check && options.diagnose) ||
         ((options.check || options.diagnose) && (options.dry_run ||
          (options.experiment != "default" && options.experiment != "none")))) {
@@ -163,7 +178,7 @@ std::wstring Validate(Options& options) {
         options.protocol = platform::ToLower(std::move(options.protocol));
         return options.prog_id.empty() ? L"--prog-id is required with --protocol." : std::wstring{};
     }
-    if (options.check || options.diagnose) {
+    if (options.check || options.diagnose || options.preflight) {
         if (options.prog_id.empty()) {
             return L"--prog-id is required with --check or --diagnose.";
         }
@@ -242,6 +257,8 @@ ParseResult Parse(int argc, wchar_t** argv) {
         options.check = data.check;
         options.diagnose = data.diagnose;
         options.latest_native_probe = data.latest_native_probe;
+        options.msbuild = data.msbuild;
+        options.preflight = data.preflight;
         options.experiment = data.experiment;
         options.log_file = CLI::widen(data.log_file);
         options.dry_run = data.dry_run;

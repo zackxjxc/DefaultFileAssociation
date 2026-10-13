@@ -175,6 +175,24 @@ to bypass administrator policy or impersonate another user.
 
 ## Current Windows 11 research status
 
+The EXE now embeds an explicit Framework64 MSBuild PDF backend. Use `--msbuild`
+for this path; it performs compatibility preflight before candidate registration,
+sets the new-format record, and verifies its Hash plus the effective Shell handler.
+The default icon index in this mode is **1**. The legacy path remains separate.
+
+```powershell
+DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=docboxtest.pdf
+DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=docboxtest.pdf --exe-path="C:\Apps\DocBox.exe" --icon-index=1 --log-file=set.log
+DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=docboxtest.pdf
+```
+
+This requires 64-bit Windows, Framework64 MSBuild, HashVersion 1, and one of two
+known system DLL fingerprints. Unknown builds fail before registration. The ISO
+profile is statically matched and still needs VM execution validation. The task
+is embedded, so no external project, Python, or Visual Studio is required at runtime.
+See the [portable VM test instructions](docs/msbuild-vm-test-package.md) and
+[three research directions](docs/default-association-research-roadmap.md).
+
 The legacy setting/check path does not implement `UserChoiceLatest`. A separate
 x64 `--latest-native-probe` can validate the new record on the exact researched
 system DLL, but its direct write was denied on the tested host. The Framework

@@ -14,6 +14,8 @@ struct Options {
     bool use_hta = true;
     bool diagnose = false;
     bool latest_native_probe = false;
+    bool msbuild = false;
+    bool preflight = false;
     std::string experiment = "default";
     std::filesystem::path log_file;
 

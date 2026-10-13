@@ -37,11 +37,15 @@ set(DFA_SOURCES
     src/diagnostics.cpp
     src/user_choice.cpp
     src/latest_native_probe.cpp
+    src/msbuild_backend.cpp
     src/crypto/win_crypto.cpp
     src/crypto/user_choice_hash.cpp
     src/cli/command_line.cpp
 )
 
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/msbuild_task.proj" DFA_MSBUILD_PROJECT)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/msbuild_task.proj")
+configure_file(src/msbuild_task_text.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/msbuild_task_text.h" @ONLY)
 add_library(dfa_core STATIC ${DFA_SOURCES})
 add_executable(DefaultFileAssociation src/main.cpp)
 add_executable(DefaultFileAssociation::DefaultFileAssociation ALIAS
@@ -56,6 +60,7 @@ target_compile_definitions(dfa_core PUBLIC
 )
 target_include_directories(dfa_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
 )
 target_link_libraries(dfa_core PUBLIC
     CLI11::CLI11

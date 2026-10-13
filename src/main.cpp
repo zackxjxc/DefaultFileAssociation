@@ -5,6 +5,7 @@
 #include "browser.h"
 #include "association_target.h"
 #include "latest_native_probe.h"
+#include "msbuild_backend.h"
 
 #include <windows.h>
 #include <CLI/Encoding.hpp>
@@ -139,6 +140,15 @@ int wmain(int argc, wchar_t** argv) {
     specification.experimental_notify = options.experiment == "notify" || options.experiment == "toasts-notify";
     // 普通设置使用 default/toasts；none 用于复现旧行为。所有只读模式都关闭确认记录写入。
 
+    if (options.msbuild && !options.dry_run) {
+        std::wstring trace;
+        const auto mode = options.preflight ? dfa::msbuild::Mode::Preflight :
+            options.check ? dfa::msbuild::Mode::Check : dfa::msbuild::Mode::Set;
+        const auto result = dfa::msbuild::Run(specification, mode, trace);
+        Print(trace);
+        PrintResult(result);
+        return log_file.is_open() && !log_file ? kExitOperationFailed : ResultExitCode(result);
+    }
     std::vector<dfa::association::Specification> plan{specification};
     if (!options.browser.empty()) {
         auto resolved = dfa::browser::Resolve(options.browser, specification);
@@ -160,6 +170,7 @@ int wmain(int argc, wchar_t** argv) {
     }
 
     if (options.dry_run) {
+        if (options.msbuild) Print(L"backend: framework-msbuild (new-format PDF)\n");
         // 只显示已经校验完的最终参数，不注册、不启动阅读器，也不启动 HTA。
         for (const auto& request : plan) {
             if (request.reuse_registered) {

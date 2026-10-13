@@ -52,6 +52,21 @@ void Run() {
 
     const auto check = Parse({L"dfa.exe", L"check", L"--ext=.pdf", L"--prog-id=DocBox.pdf"});
     Require(check.ok && check.options.check, "Check command without executable");
+    const auto msbuild = Parse({L"dfa.exe", L"--msbuild", L"--ext=.pdf", executable,
+                                L"--prog-id=docboxtest.pdf", L"--dry-run"});
+    Require(msbuild.ok && msbuild.options.msbuild && !msbuild.options.use_hta && msbuild.options.icon_index == 1,
+            "MSBuild mode defaults to icon 1 and excludes HTA");
+    Require(Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+            "MSBuild preflight does not require reader registration");
+    Require(Parse({L"dfa.exe", L"--msbuild", L"--check", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+            "MSBuild check selects new-format validation");
+    Require(!Parse({L"dfa.exe", L"--msbuild", L"--ext=.txt", executable}).ok, "MSBuild rejects untested extensions");
+    Require(!Parse({L"dfa.exe", L"--msbuild", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+            "MSBuild and native probe cannot compete");
+    Require(!Parse({L"dfa.exe", L"--preflight", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+            "Preflight requires MSBuild mode");
+    Require(!Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--check", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+            "Preflight and check cannot compete");
     const auto latest = Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.PDF", L"--prog-id=docboxtest.pdf"});
     Require(latest.ok && latest.options.latest_native_probe && !latest.options.use_hta,
             "Native latest experiment bypasses the legacy HTA path");

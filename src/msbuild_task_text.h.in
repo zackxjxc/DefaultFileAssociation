@@ -1,0 +1,4 @@
+#pragma once
+namespace dfa::msbuild {
+inline constexpr char kTaskProject[] = R"DFA_MSBUILD(@DFA_MSBUILD_PROJECT@)DFA_MSBUILD";
+}

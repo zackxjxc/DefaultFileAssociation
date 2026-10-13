@@ -59,6 +59,8 @@ void Run() {
     expect_string(prog_key, L"", specification.description);
     expect_string(prog_key + L"\\DefaultIcon", L"",
                   L"\"C:\\Program Files\\中文阅读器\\reader.exe\",1");
+    expect_string(prog_key + L"\\Application", L"ApplicationIcon",
+                  L"\"C:\\Program Files\\中文阅读器\\reader.exe\",1");
     expect_string(prog_key + L"\\shell\\open\\command", L"",
                   L"\"C:\\Program Files\\中文阅读器\\reader.exe\" \"%1\" %*");
     expect_string(L"Software\\RegisteredApplications", specification.prog_id, capabilities);

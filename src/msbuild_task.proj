@@ -1,0 +1,159 @@
+<!-- Authored by Codex. Embedded Framework MSBuild PDF task; inputs use a private child environment. -->
+<Project DefaultTargets="Apply" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <UsingTask TaskName="DfaPdfTask" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
+    <Task><Reference Include="System.Web.Extensions" /><Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Principal;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Web.Script.Serialization;
+using Microsoft.Win32;
+
+public class DfaPdfTask : Microsoft.Build.Utilities.Task {
+    [StructLayout(LayoutKind.Sequential)] struct FileTime { public uint Low, High; }
+    [StructLayout(LayoutKind.Sequential)] struct SystemTime { public ushort Year, Month, Weekday, Day, Hour, Minute, Second, Milliseconds; }
+    [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr LoadLibrary(string path);
+    [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
+    [DllImport("kernel32.dll")] static extern bool FileTimeToSystemTime(ref FileTime time, out SystemTime system);
+    [DllImport("advapi32.dll", CharSet=CharSet.Unicode)] static extern int RegQueryInfoKey(IntPtr key, IntPtr a, IntPtr b, IntPtr c, IntPtr d, IntPtr e, IntPtr f, IntPtr g, IntPtr h, IntPtr i, IntPtr j, out FileTime time);
+    [DllImport("shell32.dll")] static extern void SHChangeNotify(uint eventId, uint flags, IntPtr first, IntPtr second);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)] delegate int GetMachine(out IntPtr result);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi, CharSet=CharSet.Unicode)] delegate int Generate(uint version, string machine, string sid, string extension, string progId, ref SystemTime time, out IntPtr result);
+    static FileTime TimeOf(RegistryKey key) {
+        FileTime time;
+        int error = RegQueryInfoKey(key.Handle.DangerousGetHandle(), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out time);
+        if (error != 0) throw new Win32Exception(error);
+        return time;
+    }
+    public override bool Execute() {
+        string mode = Environment.GetEnvironmentVariable("DFA_MSB_MODE");
+        string target = Environment.GetEnvironmentVariable("DFA_MSB_PROGID");
+        string reportPath = Environment.GetEnvironmentVariable("DFA_MSB_REPORT");
+        var report = new Dictionary<string, object>();
+        string stage = "preflight";
+        int writes = 0;
+        bool success = false;
+        IntPtr module = IntPtr.Zero;
+        report["mode"] = mode;
+        report["target_prog_id"] = target;
+        try {
+            Console.OutputEncoding = new UTF8Encoding(false);
+            if (mode != "set" && mode != "check" && mode != "preflight") throw new InvalidOperationException("Invalid mode");
+            if (target == null || !Regex.IsMatch(target, @"\A[A-Za-z0-9_.-]{1,255}\z")) throw new InvalidOperationException("Invalid ProgID");
+            if (reportPath == null || !Path.IsPathRooted(reportPath)) throw new InvalidOperationException("Missing report path");
+            if (!Environment.Is64BitProcess) throw new InvalidOperationException("Framework64 MSBuild is required");
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator)) throw new InvalidOperationException("Run without elevation");
+            string sid = identity.User.Value;
+            string dll = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\windows.storage.dll");
+            report["host_executable"] = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+            report["process_bits"] = IntPtr.Size * 8;
+            stage = "dll_fingerprint";
+            using (FileStream lockedDll = File.Open(dll, FileMode.Open, FileAccess.Read, FileShare.Read)) {
+                string digest;
+                using (SHA256 sha = SHA256.Create()) digest = BitConverter.ToString(sha.ComputeHash(lockedDll)).Replace("-", "").ToLowerInvariant();
+                report["dll_sha256"] = digest;
+                int machineRva, hashRva;
+                if (digest == "8d6ac2b451af71e913665c8459935ac862e219458f0962c99f3a3d48ab9c251b") {
+                    machineRva = 0x6289FC; hashRva = 0x628D98; report["profile"] = "host-validated";
+                } else if (digest == "cf4793b9e7570f1c6621515d634e2fee115b51f6009a19e0d1a5d24cefb55703") {
+                    machineRva = 0x625E8C; hashRva = 0x626228; report["profile"] = "iso-statically-matched-vm-pending";
+                } else throw new InvalidOperationException("Unsupported windows.storage.dll; no registration or default changes should be attempted");
+                stage = "hash_version";
+                uint version;
+                using (RegistryKey hive = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                using (RegistryKey key = hive.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\SystemProtectedUserData\" + sid + @"\AnyoneRead\AppDefaults")) {
+                    if (key == null || key.GetValue("HashVersion") == null || key.GetValueKind("HashVersion") != RegistryValueKind.DWord) throw new InvalidOperationException("HashVersion is absent; new-format migration is not confirmed");
+                    version = Convert.ToUInt32(key.GetValue("HashVersion"));
+                }
+                report["hash_version"] = version;
+                if (version != 1) throw new InvalidOperationException("Only HashVersion 1 is supported");
+                stage = "load_hash_functions";
+                module = LoadLibrary(dll);
+                if (module == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+                // Reject a stale mapped image after servicing before using internal addresses.
+                lockedDll.Position = 0x3c;
+                BinaryReader header = new BinaryReader(lockedDll);
+                int peOffset = header.ReadInt32();
+                lockedDll.Position = peOffset + 8;
+                int diskStamp = header.ReadInt32();
+                int mappedPe = Marshal.ReadInt32(module, 0x3c);
+                if (Marshal.ReadInt32(module, mappedPe + 8) != diskStamp) throw new InvalidOperationException("Loaded image differs from the disk image; restart Windows");
+                GetMachine getMachine = (GetMachine)Marshal.GetDelegateForFunctionPointer(new IntPtr(module.ToInt64() + machineRva), typeof(GetMachine));
+                Generate generate = (Generate)Marshal.GetDelegateForFunctionPointer(new IntPtr(module.ToInt64() + hashRva), typeof(Generate));
+                stage = "hash_selftest";
+                SystemTime vectorTime = new SystemTime { Year=2001, Month=2, Weekday=6, Day=3, Hour=4, Minute=5, Second=6, Milliseconds=7 };
+                IntPtr vectorPointer;
+                Marshal.ThrowExceptionForHR(generate(1, "{01234567-89AB-CDEF-0123-456789ABCDEF}", "S-1-5-21-1-2-3-1000", ".pdf", "docboxtest.pdf", ref vectorTime, out vectorPointer));
+                string vectorHash;
+                try { vectorHash = Marshal.PtrToStringUni(vectorPointer); } finally { Marshal.FreeCoTaskMem(vectorPointer); }
+                report["hash_selftest"] = vectorHash == "9rTXfFYM9CQ=";
+                if (vectorHash != "9rTXfFYM9CQ=") throw new InvalidOperationException("Hash function did not pass the fixed test vector");
+                stage = "machine_id";
+                IntPtr machinePointer;
+                Marshal.ThrowExceptionForHR(getMachine(out machinePointer));
+                string machineId;
+                try { machineId = Marshal.PtrToStringUni(machinePointer); } finally { Marshal.FreeCoTaskMem(machinePointer); }
+                if (String.IsNullOrEmpty(machineId)) throw new InvalidOperationException("Machine ID is absent");
+                const string latest = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoiceLatest";
+                stage = "validate_existing_record";
+                Func<RegistryKey, string, string> calculate = delegate(RegistryKey child, string progId) {
+                    FileTime time = TimeOf(child); SystemTime timestamp;
+                    if (!FileTimeToSystemTime(ref time, out timestamp)) throw new InvalidOperationException("Invalid key timestamp");
+                    IntPtr pointer;
+                    Marshal.ThrowExceptionForHR(generate(version, machineId, sid, ".pdf", progId, ref timestamp, out pointer));
+                    try { return Marshal.PtrToStringUni(pointer); } finally { Marshal.FreeCoTaskMem(pointer); }
+                };
+                using (RegistryKey parent = Registry.CurrentUser.OpenSubKey(latest))
+                using (RegistryKey child = Registry.CurrentUser.OpenSubKey(latest + @"\ProgId")) {
+                    string beforeId = child == null ? null : child.GetValue("ProgId") as string;
+                    string beforeHash = parent == null ? null : parent.GetValue("Hash") as string;
+                    report["before_prog_id"] = beforeId; report["before_hash"] = beforeHash;
+                    if (!String.IsNullOrEmpty(beforeId)) {
+                        bool valid = calculate(child, beforeId) == beforeHash;
+                        report["before_hash_matches"] = valid;
+                        if (!valid) throw new InvalidOperationException("Existing latest Hash is invalid; establish a normal default in Windows Settings first");
+                    } else if (mode == "check") throw new InvalidOperationException("No current latest record");
+                }
+                if (mode == "set") {
+                    stage = "set_latest_progid";
+                    using (RegistryKey parent = Registry.CurrentUser.CreateSubKey(latest))
+                    using (RegistryKey child = parent.CreateSubKey("ProgId")) {
+                        child.SetValue("ProgId", target, RegistryValueKind.String); ++writes;
+                        stage = "set_latest_hash";
+                        parent.SetValue("Hash", calculate(child, target), RegistryValueKind.String); ++writes;
+                    }
+                    SHChangeNotify(0x08000000, 0x1000, IntPtr.Zero, IntPtr.Zero);
+                }
+                if (mode != "preflight") {
+                    stage = "verify_latest_record";
+                    using (RegistryKey parent = Registry.CurrentUser.OpenSubKey(latest))
+                    using (RegistryKey child = Registry.CurrentUser.OpenSubKey(latest + @"\ProgId")) {
+                        if (parent == null || child == null) throw new InvalidOperationException("Latest keys absent");
+                        string id = child.GetValue("ProgId") as string, hash = parent.GetValue("Hash") as string;
+                        bool valid = !String.IsNullOrEmpty(id) && hash == calculate(child, id);
+                        report["after_prog_id"] = id; report["after_hash"] = hash; report["after_hash_matches"] = valid;
+                        if (!String.Equals(id, target, StringComparison.OrdinalIgnoreCase) || !valid) throw new InvalidOperationException("Latest record did not verify");
+                    }
+                }
+                success = true;
+            }
+        } catch (Exception error) {
+            report["failure_stage"] = stage; report["error"] = error.Message;
+            report["hresult"] = "0x" + error.HResult.ToString("x8");
+        } finally { if (module != IntPtr.Zero) FreeLibrary(module); }
+        report["completed_registry_writes"] = writes; report["success"] = success;
+        File.WriteAllText(reportPath, new JavaScriptSerializer().Serialize(report) + "\n", new UTF8Encoding(false));
+        if (!success) Log.LogError("PDF task failed at " + stage);
+        return success;
+    }
+}
+    ]]></Code></Task>
+  </UsingTask>
+  <Target Name="Apply"><DfaPdfTask /></Target>
+</Project>
