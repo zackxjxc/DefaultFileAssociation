@@ -1,0 +1,86 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 29,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "windows-x86",
+      "displayName": "Windows 7+ x86 (32-bit and 64-bit Windows)",
+      "inherits": "windows-x64",
+      "architecture": "Win32",
+      "binaryDir": "${sourceDir}/out/build/${presetName}-v143"
+    },
+    {
+      "name": "windows-x86-tests",
+      "displayName": "Windows x86 with tests",
+      "inherits": "windows-x86",
+      "binaryDir": "${sourceDir}/out/build/${presetName}-v143",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "windows-x64",
+      "displayName": "Windows 7+ x64 (Visual Studio 2026, v143)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "toolset": "v143",
+      "binaryDir": "${sourceDir}/out/build/${presetName}-v143",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "DFA_FETCH_DEPENDENCIES": "ON",
+        "BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "windows-x64-tests",
+      "displayName": "Windows x64 with tests",
+      "inherits": "windows-x64",
+      "binaryDir": "${sourceDir}/out/build/${presetName}-v143",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-x86-release",
+      "configurePreset": "windows-x86",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-x86-tests-debug",
+      "configurePreset": "windows-x86-tests",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-x86-tests-release",
+      "configurePreset": "windows-x86-tests",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-x64-release",
+      "configurePreset": "windows-x64",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-x64-debug",
+      "configurePreset": "windows-x64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-x64-tests-debug",
+      "configurePreset": "windows-x64-tests",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-x64-tests-release",
+      "configurePreset": "windows-x64-tests",
+      "configuration": "Release"
+    }
+  ]
+}

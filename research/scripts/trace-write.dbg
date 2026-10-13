@@ -1,0 +1,14 @@
+.sympath E:\Work\DefaultFileAssociation\research\symbols
+.reload /f ntdll.dll
+bu ntdll!NtSetValueKey
+g
+.echo === Verified write syscall entry ===
+du poi(@rdx+8)
+du poi(@rsp+0x28)
+!handle @rcx f
+k
+gu
+.echo === Verified write syscall return ===
+r eax
+bc *
+g

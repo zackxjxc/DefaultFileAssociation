@@ -1,0 +1,11 @@
+DefaultFileAssociation's own source is released under the MIT License; see
+LICENSE. It bundles the following source dependencies through CMake
+FetchContent.  Their source revisions are pinned in `cmake/Dependencies.cmake`.
+
+* CLI11 v2.7.2 (commit 919ce47dad39520a6e9a695d3e2d222c6920a445),
+  BSD-3-Clause, https://github.com/CLIUtils/CLI11
+* Microsoft WIL v1.0.260126.7 (commit cbf677fb0a942557d08fd129f4c106a76247b2ec),
+  MIT, https://github.com/microsoft/wil
+
+When redistributing a source archive, retain the upstream license files and
+copyright notices supplied by those projects.

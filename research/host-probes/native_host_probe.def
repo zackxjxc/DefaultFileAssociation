@@ -1,0 +1,3 @@
+LIBRARY PdfAssociationHostProbe
+EXPORTS
+    DllRegisterServer PRIVATE

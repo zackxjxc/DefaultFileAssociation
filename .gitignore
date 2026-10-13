@@ -1,0 +1,32 @@
+# CMake and Visual Studio output
+/out/
+/.vs/
+/CMakeUserPresets.json
+
+# Local editor and operating-system files
+.idea/
+*.user
+*.suo
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Local research binaries, third-party tools, symbols, and raw evidence
+/research/binaries/
+/research/tools/
+/research/symbols/
+/research/iso-inspection/
+/research/evidence/
+/research/host-probes/bin/
+/research/host-probes/LatestAssociationProbe.cs
+/research/host-probes/workflow-input.xml
+/research/host-probes/odbc-probe.rsp
+
+# Reader samples and machine-specific test reports remain local
+/test_case/*.exe
+/test_case/*.dll
+/test_case/*.pdf
+/test_case/results/
+__pycache__/
+*.pyc
+*.dmp
