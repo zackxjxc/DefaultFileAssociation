@@ -16,6 +16,8 @@ struct Options {
     bool latest_native_probe = false;
     bool msbuild = false;
     bool preflight = false;
+    // legacy keeps the existing in-process path; other values select a PDF host backend.
+    std::string backend = "legacy";
     std::string experiment = "default";
     std::filesystem::path log_file;
 

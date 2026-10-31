@@ -75,7 +75,7 @@ DefaultFileAssociation.exe --browser="Google Chrome" --check
 
 ## Windows 11 研究状态
 
-EXE 内嵌了 Framework64 MSBuild PDF 实验后端。使用 `--msbuild` 时，程序会先进行版本兼容性检查，再注册候选程序、写入新格式记录，并验证 Hash 与有效 Shell 处理器。该模式的默认图标序号是 **1**：
+EXE 内嵌了 Framework64 MSBuild PDF 后端，也支持四种可选择的系统宿主后端。使用这些后端时，程序会先进行版本兼容性检查，再注册候选程序、写入新格式记录，并验证 Hash 与有效 Shell 处理器。默认图标序号是 **1**：
 
 ```powershell
 DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
@@ -83,13 +83,24 @@ DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --
 DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreader.pdf
 ```
 
-该模式要求 64 位 Windows、Framework64 MSBuild、HashVersion 1 和精确匹配的 `windows.storage.dll` 指纹。未知版本会在注册前拒绝继续。任务已嵌入 EXE，运行时不需要 Python、Visual Studio 或外部 `.proj` 文件。[虚拟机测试包说明](docs/msbuild-vm-test-package.md)。
+四种宿主使用同样的参数和三个操作阶段，只需把 `--msbuild` 换成 `--backend=<name>`：
 
-独立的 `--latest-native-probe` 只用于特定构建的研究验证；已测试主机上的直接写入被拒绝。旧设置路径不实现 `UserChoiceLatest`。HTA 和工作流编译器路线已经从当前研究计划中排除；InstallUtil、Regsvr32、ODBCConf、msiexec 只在研究脚本中用于对照，不是产品后端。
+```powershell
+DefaultFileAssociation-x64.exe --backend=installutil --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation-x64.exe --backend=regsvr32 --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe"
+DefaultFileAssociation-x64.exe --backend=odbcconf --check --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe"
+```
+
+可用名称为 `msbuild`、`installutil`、`regsvr32`、`odbcconf` 和 `msiexec`；`--msbuild` 是 `--backend=msbuild` 的兼容别名。四种新增路线分别使用托管宿主 DLL 或原生宿主 DLL，DLL 会随构建输出放在 EXE 旁边。它们只支持 `.pdf`、`DefaultFileAssociation-x64.exe` 和普通用户权限；x86 EXE 会拒绝这些模式。
+
+这些新格式后端都要求 `HashVersion=1` 和精确匹配的 `windows.storage.dll` 指纹。未知版本会在注册前拒绝继续；设置失败不会自动回退到旧路径。MSBuild 任务嵌入 EXE，其他宿主使用随 EXE 构建的 `DfaAssociationHost-*.dll` 和 `DfaAssociationManagedHost-*.dll`，运行时不需要 Python 或 Visual Studio。[虚拟机测试包说明](docs/msbuild-vm-test-package.md)。
+
+独立的 `--latest-native-probe` 仍只用于特定构建的研究验证；已测试主机上的直接写入被拒绝。旧设置路径不实现 `UserChoiceLatest`。HTA 和工作流编译器路线已经从当前研究计划中排除。
 
 ### 模式与 UCPD 边界
 
-程序提供一个用户级默认关联接口，支持文件扩展名、协议和已安装浏览器。研究记录中有五类宿主对照路径：
+程序提供一个用户级默认关联接口，支持文件扩展名、协议和已安装浏览器；PDF 新格式还提供五种显式后端：
 
 1. Framework64 MSBuild；
 2. InstallUtil；
@@ -97,7 +108,7 @@ DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreade
 4. ODBCConf；
 5. msiexec。
 
-这五类是研究对照，不是 UCPD 绕过选择器，也不是产品后端。项目不修改 UCPD 驱动、不向受信任进程注入、不伪造进程身份、不关闭 Defender，也不改变系统保护设置。HTA 和工作流编译器路线因安全检测已排除。`--latest-native-probe` 是独立的版本受限探针，只读验证不能等同于受支持的设置接口。
+这些后端不是 UCPD 绕过选择器。项目不修改 UCPD 驱动、不向受信任进程注入、不伪造进程身份、不关闭 Defender，也不改变系统保护设置。HTA 和工作流编译器路线因安全检测已排除。`--latest-native-probe` 是独立的版本受限探针，只读验证不能等同于受支持的设置接口。
 
 `--diagnose` 会在不写入的情况下报告两层 Hash：`legacy_hash_profile` 表示根据系统版本选择的 Legacy、Windows 10 Threshold 1 或 Threshold 2 及以上算法；`latest_hash_version` 和 `hash_profile` 表示是否检测到经过验证的 `UserChoiceLatest` 记录。只有受保护的 `HashVersion` 值和记录结构同时存在时，才认为新结构已启用；不能只根据 OS build 判断。
 

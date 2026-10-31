@@ -78,9 +78,9 @@ MSBuild、msiexec、InstallUtil、Regsvr32、ODBCConf 均不在这 14 项中。�
 | ODBCConf | 同一个 C++ 原生 DLL与 REGSVR 配置指令 | 开发阶段预先编译 | DllRegisterServer |
 | msiexec | 同一个 C++ 原生 DLL | 开发阶段预先编译 | DllRegisterServer |
 
-MSBuild 当前执行路径是 C# 源码到 .NET 程序集，再由 CLR 加载和 JIT 执行；不是 C/C++ 编译 OBJ、链接成新 EXE 再启动。后四种都加载 DLL，但 InstallUtil 的托管 DLL与后三种的原生 DLL不是同一种构建产物。后三种可以共用现有原生研究 DLL。
+MSBuild 当前执行路径是 C# 源码到 .NET 程序集，再由 CLR 加载和 JIT 执行；不是 C/C++ 编译 OBJ、链接成新 EXE 再启动。后四种都加载 DLL，但 InstallUtil 的托管 DLL与后三种的原生 DLL不是同一种构建产物。后三种共用正式构建的原生宿主 DLL，研究 DLL 仍保留用于历史复现。
 
-业务逻辑可以保持在固定 DLL 中，每次操作参数由本地 JSON 动态提供。以下是拟议配置格式，尚未实现：
+正式宿主后端将业务逻辑保持在固定 DLL 中，每次操作参数由父进程通过受控环境变量动态提供。配置内容等价于以下字段：
 
 ```json
 {
@@ -91,9 +91,9 @@ MSBuild 当前执行路径是 C# 源码到 .NET 程序集，再由 CLR 加载和
 }
 ```
 
-拟议流程为：我们的 EXE 根据用户选择生成独立临时 JSON，通过子进程环境变量传递配置文件路径；宿主加载 DLL并调用约定入口；DLL读取并校验配置，执行设置并输出报告；我们的 EXE 独立检查有效关联后清理临时文件。环境变量适合 DllRegisterServer 这种没有自定义参数的入口，避免把配置直接拼入宿主命令行。
+当前流程为：我们的 EXE 根据用户选择创建临时工作目录，通过子进程环境变量传递模式、ProgID、DLL 和报告路径；宿主加载 DLL 并调用约定入口；DLL读取并校验配置，执行设置并输出报告；我们的 EXE 独立检查有效关联后清理临时文件。环境变量适合 DllRegisterServer 这种没有自定义参数的入口，避免把配置直接拼入宿主命令行。
 
-当前 MSBuild 已动态接收 ProgID、操作模式和报告路径。其他宿主的研究 DLL 仍固定使用 samplepdfreader.pdf，尚未实现 JSON 参数化；本节只记录设计结论，没有修改实现。系统 DLL 指纹、内部函数地址和 HashVersion 支持范围仍由版本适配代码管理，增加配置文件不自动扩大 Windows 兼容范围。
+当前 MSBuild 和四种正式宿主后端都动态接收 ProgID、操作模式和报告路径。原有研究 DLL 和研究脚本仍保留固定样本用于复现实验；正式 DLL 不再固定使用 samplepdfreader.pdf。系统 DLL 指纹、内部函数地址和 HashVersion 支持范围仍由版本适配代码管理，增加配置传递不自动扩大 Windows 兼容范围。
 
 代码需要在宿主进程内实际执行。仅让 MSBuild 或另一个宿主启动我们的普通 EXE，写入进程身份仍是该 EXE，不能把父进程身份当作可继承的放行授权。
 

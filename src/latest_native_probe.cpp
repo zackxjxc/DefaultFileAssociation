@@ -18,6 +18,7 @@
 #include <exception>
 #include <filesystem>
 #include <format>
+#include <optional>
 #include <vector>
 
 namespace dfa::latest_native {
@@ -26,7 +27,22 @@ namespace {
 #if defined(_M_X64)
 
 constexpr auto kLatest = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.pdf\\UserChoiceLatest";
-constexpr auto kDigest = L"8d6ac2b451af71e913665c8459935ac862e219458f0962c99f3a3d48ab9c251b";
+
+struct HashProfile {
+    std::wstring_view digest;
+    uintptr_t machine_rva;
+    uintptr_t hash_rva;
+};
+
+std::optional<HashProfile> Profile(std::wstring_view digest) {
+    if (digest == L"8d6ac2b451af71e913665c8459935ac862e219458f0962c99f3a3d48ab9c251b") {
+        return HashProfile{digest, 0x6289FC, 0x628D98};
+    }
+    if (digest == L"cf4793b9e7570f1c6621515d634e2fee115b51f6009a19e0d1a5d24cefb55703") {
+        return HashProfile{digest, 0x625E8C, 0x626228};
+    }
+    return std::nullopt;
+}
 
 struct State {
     std::wstring prog_id;
@@ -97,6 +113,91 @@ bool VerifyShell(std::wstring_view target, const std::wstring& expected_command,
 
 } // namespace
 
+Result Preflight(std::wstring& trace) {
+    trace = std::format(L"engine=latest-native\nmode=preflight\nprocess_bits={}\n", sizeof(void*) * 8);
+#if !defined(_M_X64)
+    trace += L"failure_stage=architecture\ncompleted_registry_writes=0\n";
+    return {Status::Failed, L"This build-specific experiment requires the x64 EXE.", ERROR_NOT_SUPPORTED, false};
+#else
+    std::wstring stage = L"preflight";
+    try {
+        THROW_HR_IF(E_ACCESSDENIED, platform::IsProcessElevated());
+        const std::wstring sid = platform::GetCurrentUserSid();
+        THROW_HR_IF(E_UNEXPECTED, sid.empty());
+        std::array<wchar_t, MAX_PATH> directory{};
+        const UINT count = ::GetSystemDirectoryW(directory.data(), static_cast<UINT>(directory.size()));
+        THROW_LAST_ERROR_IF(count == 0);
+        THROW_HR_IF(E_UNEXPECTED, count >= directory.size());
+        const auto dll = std::filesystem::path(directory.data()) / L"windows.storage.dll";
+        stage = L"dll_fingerprint";
+        wil::unique_hfile dll_lock(::CreateFileW(dll.c_str(), GENERIC_READ, FILE_SHARE_READ,
+            nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
+        const auto digest = FileSha256(dll);
+        trace += L"dll_sha256=" + digest + L"\n";
+        const auto profile = Profile(digest);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !profile);
+        stage = L"hash_version";
+        wil::unique_hkey protected_key;
+        const std::wstring protected_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\SystemProtectedUserData\\" +
+            sid + L"\\AnyoneRead\\AppDefaults";
+        THROW_IF_WIN32_ERROR(::RegOpenKeyExW(HKEY_LOCAL_MACHINE, protected_path.c_str(), 0,
+            KEY_READ | KEY_WOW64_64KEY, protected_key.put()));
+        DWORD version = 0, size = sizeof(version), type = 0;
+        THROW_IF_WIN32_ERROR(::RegQueryValueExW(protected_key.get(), L"HashVersion", nullptr, &type,
+            reinterpret_cast<BYTE*>(&version), &size));
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), type != REG_DWORD || size != sizeof(version) || version != 1);
+        trace += std::format(L"hash_version={}\n", version);
+        stage = L"load_hash_functions";
+        wil::unique_hmodule module(::LoadLibraryW(dll.c_str()));
+        THROW_LAST_ERROR_IF(module.get() == nullptr);
+        using GetMachine = HRESULT(WINAPI*)(wchar_t**);
+        using Generate = HRESULT(WINAPI*)(DWORD, const wchar_t*, const wchar_t*, const wchar_t*,
+            const wchar_t*, SYSTEMTIME*, wchar_t**);
+        const auto base = reinterpret_cast<const BYTE*>(module.get());
+        const auto get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
+        const auto generate = reinterpret_cast<Generate>(base + profile->hash_rva);
+        wil::unique_cotaskmem_string machine;
+        THROW_IF_FAILED(get_machine(machine.put()));
+        THROW_HR_IF(E_UNEXPECTED, machine == nullptr || machine.get()[0] == L'\0');
+        stage = L"hash_selftest";
+        SYSTEMTIME vector_time{2001, 2, 6, 3, 4, 5, 6, 7};
+        wil::unique_cotaskmem_string vector_hash;
+        THROW_IF_FAILED(generate(1, L"{01234567-89AB-CDEF-0123-456789ABCDEF}",
+            L"S-1-5-21-1-2-3-1000", L".pdf", L"samplepdfreader.pdf", &vector_time, vector_hash.put()));
+        const bool vector_matches = vector_hash != nullptr && std::wstring(vector_hash.get()) == L"9rTXfFYM9CQ=";
+        trace += std::format(L"hash_selftest={}\n", vector_matches);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !vector_matches);
+        stage = L"validate_existing_record";
+        wil::unique_hkey parent, child;
+        THROW_IF_WIN32_ERROR(::RegOpenKeyExW(HKEY_CURRENT_USER, kLatest, 0, KEY_READ, parent.put()));
+        const std::wstring child_path = std::wstring(kLatest) + L"\\ProgId";
+        THROW_IF_WIN32_ERROR(::RegOpenKeyExW(HKEY_CURRENT_USER, child_path.c_str(), 0, KEY_READ, child.put()));
+        const auto before = ReadState(parent.get(), child.get());
+        Describe(trace, L"before", before);
+        SYSTEMTIME timestamp{};
+        THROW_IF_WIN32_BOOL_FALSE(::FileTimeToSystemTime(&before.time, &timestamp));
+        wil::unique_cotaskmem_string calculated;
+        THROW_IF_FAILED(generate(version, machine.get(), sid.c_str(), L".pdf", before.prog_id.c_str(),
+            &timestamp, calculated.put()));
+        const bool matches = calculated != nullptr && std::wstring(calculated.get()) == before.hash;
+        trace += std::format(L"before_hash_matches={}\n", matches);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !matches);
+        trace += L"preflight_success=true\ncompleted_registry_writes=0\n";
+        return {Status::Success, L"Latest association host preflight passed; no writes were attempted.", 0, false};
+    } catch (const wil::ResultException& error) {
+        const HRESULT hr = error.GetErrorCode();
+        const auto code = HRESULT_FACILITY(hr) == FACILITY_WIN32 ? static_cast<DWORD>(HRESULT_CODE(hr)) : 0;
+        trace += std::format(L"failure_stage={}\nfailure_hresult=0x{:08x}\ncompleted_registry_writes=0\npreflight_success=false\n",
+            stage, static_cast<DWORD>(hr));
+        return {Status::Failed, L"Latest association host preflight failed at " + stage + L".", code, false};
+    } catch (const std::exception&) {
+        trace += std::format(L"failure_stage={}\ncompleted_registry_writes=0\npreflight_success=false\n", stage);
+        return {Status::Failed, L"Latest association host preflight encountered an unexpected error.", 0, false};
+    }
+#endif
+}
+
 Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
     trace = std::format(L"engine=latest-native\nprocess_bits={}\nattempt_set={}\ntarget_prog_id={}\n",
         sizeof(void*) * 8, attempt_set, prog_id);
@@ -129,7 +230,8 @@ Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
         THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
         const auto digest = FileSha256(dll);
         trace += L"dll_sha256=" + digest + L"\n";
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), digest != kDigest);
+        const auto profile = Profile(digest);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !profile);
         stage = L"hash_version";
         wil::unique_hkey protected_key;
         const std::wstring protected_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\SystemProtectedUserData\\" +
@@ -149,8 +251,8 @@ Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
         using Generate = HRESULT(WINAPI*)(DWORD, const wchar_t*, const wchar_t*, const wchar_t*,
             const wchar_t*, SYSTEMTIME*, wchar_t**);
         const auto base = reinterpret_cast<const BYTE*>(module.get());
-        const auto get_machine = reinterpret_cast<GetMachine>(base + 0x6289FC);
-        const auto generate = reinterpret_cast<Generate>(base + 0x628D98);
+        const auto get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
+        const auto generate = reinterpret_cast<Generate>(base + profile->hash_rva);
         wil::unique_cotaskmem_string machine;
         THROW_IF_FAILED(get_machine(machine.put()));
         stage = L"open_latest_keys";

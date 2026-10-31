@@ -177,10 +177,10 @@ to bypass administrator policy or impersonate another user.
 
 ## Current Windows 11 research status
 
-The EXE now embeds an explicit Framework64 MSBuild PDF backend. Use `--msbuild`
-for this path; it performs compatibility preflight before candidate registration,
-sets the new-format record, and verifies its Hash plus the effective Shell handler.
-The default icon index in this mode is **1**. The legacy path remains separate.
+The EXE now embeds an explicit Framework64 MSBuild PDF backend and supports four
+additional selectable Windows host backends. Each backend performs compatibility
+preflight before candidate registration, sets the new-format record, and verifies
+its Hash plus the effective Shell handler. The default icon index is **1**.
 
 ```powershell
 DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
@@ -195,6 +195,23 @@ is embedded, so no external project, Python, or Visual Studio is required at run
 See the [portable VM test instructions](docs/msbuild-vm-test-package.md) and
 [three research directions](docs/default-association-research-roadmap.md).
 
+The four host modes use the same arguments and `--preflight`/`--check` stages:
+
+```powershell
+DefaultFileAssociation-x64.exe --backend=installutil --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation-x64.exe --backend=regsvr32 --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe"
+DefaultFileAssociation-x64.exe --backend=odbcconf --check --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe"
+```
+
+The accepted backend names are `msbuild`, `installutil`, `regsvr32`, `odbcconf`,
+and `msiexec`; `--msbuild` remains an alias for `--backend=msbuild`. The four
+new modes load the managed or native host DLLs built beside the EXE. They are
+limited to PDF, the `DefaultFileAssociation-x64.exe` build, and non-elevated users;
+the x86 executable rejects these modes. Unknown system DLL
+fingerprints fail before registration, and a failed selected backend does not
+fall back to the legacy path.
+
 The legacy setting/check path does not implement `UserChoiceLatest`. A separate
 x64 `--latest-native-probe` can validate the new record on the exact researched
 system DLL, but its direct write was denied on the tested host. The Framework
@@ -202,16 +219,17 @@ MSBuild experiment completed writes and independent validation on that host;
 it is not a portable or supported Windows API implementation.
 
 The HTA route is excluded from the current research plan. Workflow compiler
-tests triggered Defender and are also excluded. Other host experiments are
-research artifacts, not deployment recommendations. No further host execution
-tests should be run on the physical workstation; VM validation must retain
-Defender and record both association results and security detections.
+tests triggered Defender and are also excluded. The host backends remain
+version-gated experiments and need VM validation on each supported system DLL
+build. No further host execution tests should be run on the physical
+workstation; VM validation must retain Defender and record both association
+results and security detections.
 
 ### Modes and UCPD boundary
 
 The executable provides one user-level association API for file extensions,
-protocols, and installed browsers. Five host-based routes have been recorded as
-research comparisons for protected default-association writes:
+protocols, and installed browsers. PDF new-format writes can explicitly select
+one of five host-based routes:
 
 1. Framework64 MSBuild;
 2. InstallUtil;
@@ -219,10 +237,10 @@ research comparisons for protected default-association writes:
 4. ODBCConf;
 5. msiexec.
 
-These are research observations, not a UCPD bypass selector or product backends.
-The repository does not patch UCPD, inject into a trusted process, spoof process
-identity, disable Defender, or change system protection settings. HTA and the
-workflow compiler are excluded after security detections. The native
+These are explicit host backends, not a UCPD bypass selector. The repository
+does not patch UCPD, inject into a trusted process, spoof process identity,
+disable Defender, or change system protection settings. HTA and the workflow
+compiler are excluded after security detections. The native
 `--latest-native-probe` is a separate, version-gated probe and its read-only
 validation must not be confused with a supported setter.
 

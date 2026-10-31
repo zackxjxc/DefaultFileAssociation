@@ -56,6 +56,10 @@ def main() -> None:
     required = {
         "DefaultFileAssociation.exe": x86,
         "DefaultFileAssociation-x64.exe": x64,
+        "DfaAssociationHost-x86.dll": x86.parent / "DfaAssociationHost-x86.dll",
+        "DfaAssociationManagedHost-x86.dll": x86.parent / "DfaAssociationManagedHost-x86.dll",
+        "DfaAssociationHost-x64.dll": x64.parent / "DfaAssociationHost-x64.dll",
+        "DfaAssociationManagedHost-x64.dll": x64.parent / "DfaAssociationManagedHost-x64.dll",
         "README.md": root / "README.md",
         "README.zh-CN.md": root / "README.zh-CN.md",
         "LICENSE": root / "LICENSE",
@@ -95,7 +99,7 @@ def main() -> None:
     manifest = {
         "version": options.version,
         "commit": git_revision(root),
-        "backend": "Windows per-user association tool; Framework64 MSBuild is version-gated research mode",
+        "backend": "Windows per-user association tool; selectable version-gated PDF backends",
         "optional_sample_files_missing": optional_missing,
         "files": {
             name: {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}

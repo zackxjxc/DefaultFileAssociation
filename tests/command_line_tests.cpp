@@ -3,9 +3,11 @@
 
 #include <windows.h>
 
+#include <array>
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -56,10 +58,27 @@ void Run() {
                                 L"--prog-id=samplepdfreader.pdf", L"--dry-run"});
     Require(msbuild.ok && msbuild.options.msbuild && !msbuild.options.use_hta && msbuild.options.icon_index == 1,
             "MSBuild mode defaults to icon 1 and excludes HTA");
+    Require(msbuild.options.backend == "msbuild", "MSBuild alias selects the named backend");
     Require(Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild preflight does not require reader registration");
     Require(Parse({L"dfa.exe", L"--msbuild", L"--check", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild check selects new-format validation");
+    for (const auto& [wide_backend, backend] : std::array<std::pair<const wchar_t*, const char*>, 4>{{
+             {L"installutil", "installutil"}, {L"regsvr32", "regsvr32"},
+             {L"odbcconf", "odbcconf"}, {L"msiexec", "msiexec"}}}) {
+        const auto selected = Parse({L"dfa.exe", L"--backend", wide_backend, L"--ext=.pdf", executable,
+                                     L"--prog-id=samplepdfreader.pdf", L"--dry-run"});
+        Require(selected.ok && selected.options.backend == backend && !selected.options.use_hta &&
+                    selected.options.icon_index == 1,
+                "Named host backend accepts MSBuild-style PDF arguments");
+    }
+    Require(Parse({L"dfa.exe", L"--backend=installutil", L"--preflight", L"--ext=.pdf",
+                   L"--prog-id=samplepdfreader.pdf"}).ok,
+            "Named host backend supports preflight without reader registration");
+    Require(!Parse({L"dfa.exe", L"--backend=installutil", L"--ext=.txt", executable}).ok,
+            "Named host backend rejects untested extensions");
+    Require(!Parse({L"dfa.exe", L"--backend=installutil", L"--msbuild", L"--ext=.pdf", executable}).ok,
+            "MSBuild alias cannot compete with another backend");
     Require(!Parse({L"dfa.exe", L"--msbuild", L"--ext=.txt", executable}).ok, "MSBuild rejects untested extensions");
     Require(!Parse({L"dfa.exe", L"--msbuild", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild and native probe cannot compete");

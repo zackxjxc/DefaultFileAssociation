@@ -12,6 +12,10 @@ output = root / "out" / "packages" / ("DefaultFileAssociation-MSBuild-" + stamp 
 sources = {
     "DefaultFileAssociation.exe": root / "out/build/windows-x86-v143/Release/DefaultFileAssociation.exe",
     "DefaultFileAssociation-x64.exe": root / "out/build/windows-x64-v143/Release/DefaultFileAssociation.exe",
+    "DfaAssociationHost-x86.dll": root / "out/build/windows-x86-v143/Release/DfaAssociationHost-x86.dll",
+    "DfaAssociationManagedHost-x86.dll": root / "out/build/windows-x86-v143/Release/DfaAssociationManagedHost-x86.dll",
+    "DfaAssociationHost-x64.dll": root / "out/build/windows-x64-v143/Release/DfaAssociationHost-x64.dll",
+    "DfaAssociationManagedHost-x64.dll": root / "out/build/windows-x64-v143/Release/DfaAssociationManagedHost-x64.dll",
     "SamplePdfReader.exe": root / "test_case/SamplePdfReader.exe",
     "libsamplepdfreader.dll": root / "test_case/libsamplepdfreader.dll",
     "012.pdf": root / "test_case/012.pdf",
@@ -23,7 +27,7 @@ payloads = {name: path.read_bytes() for name, path in sources.items()}
 commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
 manifest = {
     "commit": commit, "prog_id": "samplepdfreader.pdf", "icon_index": 1,
-    "backend": "Windows Framework64 MSBuild; task embedded in EXE",
+    "backend": "Windows per-user association tool; selectable version-gated PDF backends",
     "files": {name: {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
               for name, data in payloads.items()},
 }

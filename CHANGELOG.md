@@ -4,6 +4,8 @@ All notable changes to this project are recorded here. Release archives include 
 
 ## [Unreleased]
 
+- Add selectable PDF backends for MSBuild, InstallUtil, Regsvr32, ODBCConf, and msiexec with shared preflight, check, and Shell verification.
+- Build and package the managed and native host DLLs required by the four additional backends.
 - Add future changes here before creating the next version tag.
 
 ## [v0.1.0] - 2026-10-31

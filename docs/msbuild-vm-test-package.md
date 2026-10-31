@@ -61,6 +61,25 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-msbuild-package.p
 
 设置不是事务：候选注册成功后，后续默认写入可能失败；报告如实返回非零并保留失败阶段。manifest.json 提供源码提交号和包内文件 SHA-256。测试包是实验交付，不代表已完成跨版本、持久性或全部防护环境验证。
 
+## 选择其他宿主
+
+同一个 EXE 也接受 `--backend=installutil`、`--backend=regsvr32`、
+`--backend=odbcconf` 和 `--backend=msiexec`。它们使用随 EXE 放置的
+`DfaAssociationHost-x64.dll` 和 `DfaAssociationManagedHost-x64.dll`，参数和阶段与
+MSBuild 相同：
+
+```powershell
+.\DefaultFileAssociation-x64.exe --backend=installutil --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
+.\DefaultFileAssociation-x64.exe --backend=regsvr32 --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\DFA Test\SamplePdfReader.exe"
+.\DefaultFileAssociation-x64.exe --backend=odbcconf --check --ext=.pdf --prog-id=samplepdfreader.pdf
+.\DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\DFA Test\SamplePdfReader.exe"
+```
+
+这些模式当前要求 x64 构建、64 位 Windows、普通用户、HashVersion 1 和已支持的
+`windows.storage.dll` 指纹。预检失败时不会注册候选程序；设置失败时不会自动切换到
+Legacy 或 MSBuild。真实部署前应在保留 Defender 和 UCPD 的 VM 中分别记录宿主退出码、
+Hash/Shell 复查、首次设置、重启持久性和安全中心事件。
+
 ## 本次交付验证
 
 2026-10-14：x86/x64 Release 构建及静态 API 导入检查通过，6 项 CTest 通过。图标测试同时核对 DefaultIcon 和 ApplicationIcon 的序号 1。集成 EXE 在本机通过 Preflight/Check，包括固定 Hash 自检、已有记录 Hash 和 Shell 有效关联校验；子任务均报告 0 次注册表写入。

@@ -310,7 +310,7 @@ PDF 对应规则类别 1。默认配置在 RVA `0x116C4` 分配并清零；初�
 
 ### 其他宿主实验与 Defender 告警
 
-后台筛查了本机 12 个候选路径。InstallUtil、Regsvr32、ODBCConf 的回调均成功完成固定 `samplepdfreader.pdf` 的两次设置调用，随后独立原生检查 Hash 与 Shell 返回 0。当前记录原本即为目标，任务没有跳过真实写入；没有安装服务、注册实际 COM 组件或创建 ODBC 数据源。RegAsm 在回调前因权限要求退出 100，没有执行目标写入。结果与完整逐项日志在 `research/evidence/alternate-host-results.json`、`research/evidence/host-probes`。
+后台筛查了本机 12 个候选路径。InstallUtil、Regsvr32、ODBCConf 的回调均成功完成固定 `samplepdfreader.pdf` 的两次设置调用，随后独立原生检查 Hash 与 Shell 返回 0；后续又加入了 msiexec。当前记录原本即为目标，任务没有跳过真实写入；没有安装服务、注册实际 COM 组件或创建 ODBC 数据源。RegAsm 在回调前因权限要求退出 100，没有执行目标写入。结果与完整逐项日志在 `research/evidence/alternate-host-results.json`、`research/evidence/host-probes`。
 
 另测试了 Microsoft.Workflow.Compiler 的普通工作流编译/验证回调。虽然测试进程退出 0、回调报告成功且关联验证通过，但随后 Defender 行为监控命中，因此不能将它计为可用方案，也不能仅以退出码或关联生效判断宿主方案可部署。
 
@@ -318,9 +318,9 @@ PDF 对应规则类别 1。默认配置在 RVA `0x116C4` 分配并清零；初�
 
 告警资源为行为/进程对象；系统 Microsoft.Workflow.Compiler.exe 文件仍存在，签名检查有效。Get-MpThreatDetection 报告处理成功，事件显示无需额外操作；没有据此宣称全机无风险。Defender 的实时保护和行为监控保持启用。没有关闭防护、添加排除项、恢复或重建被处理内容。
 
-已停止主机上的新宿主执行测试。`run_alternate_host_tests.py` 移除了 workflow 执行计划与选项，并要求显式选择其余宿主，默认不再执行任何宿主。工作流相关源码仅保留为静态分析证据。后续此类行为风险较高的研究应转到隔离虚拟机，保持防护启用并记录拦截结果。
+已停止主机上的 workflow 新宿主执行测试。`run_alternate_host_tests.py` 移除了 workflow 执行计划与选项，并要求显式选择其余研究宿主；工作流相关源码仅保留为静态分析证据。正式代码现在提供 `--backend=installutil|regsvr32|odbcconf|msiexec`，但仍受同一系统 DLL 指纹和 x64 条件限制。后续此类行为风险较高的研究应转到隔离虚拟机，保持防护启用并记录拦截结果。
 
-告警证据为 `research/evidence/defender-host-experiment-events.json` 与 `defender-workflow-threat-detection.json`。新增原生宿主 DLL 通过默认关闭的 CMake 选项 `DFA_BUILD_HOST_PROBES` 构建；所有实验仍受当前系统 DLL 精确指纹与固定 PDF 目标限制。
+告警证据为 `research/evidence/defender-host-experiment-events.json` 与 `defender-workflow-threat-detection.json`。正式宿主 DLL 通过默认开启的 `DFA_BUILD_HOST_BACKENDS` 构建；历史研究探针仍由 `DFA_BUILD_HOST_PROBES` 控制。正式后端接受用户传入的 ProgID 和关联参数，但所有实验仍受系统 DLL 指纹、x64 架构和 HashVersion 限制。
 
 ## 2026-10-14：无需研究宿主的正常流程分析
 

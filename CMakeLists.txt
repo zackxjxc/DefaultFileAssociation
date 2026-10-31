@@ -38,6 +38,7 @@ set(DFA_SOURCES
     src/user_choice.cpp
     src/latest_native_probe.cpp
     src/msbuild_backend.cpp
+    src/association_host_backend.cpp
     src/crypto/win_crypto.cpp
     src/crypto/user_choice_hash.cpp
     src/cli/command_line.cpp
@@ -75,6 +76,63 @@ target_link_libraries(dfa_core PUBLIC
 )
 target_link_libraries(DefaultFileAssociation PRIVATE dfa_core)
 
+option(DFA_BUILD_HOST_BACKENDS "Build selectable Windows host association backends" ON)
+if(DFA_BUILD_HOST_BACKENDS)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(DFA_HOST_ARCH x64)
+    else()
+        set(DFA_HOST_ARCH x86)
+    endif()
+    add_library(DfaAssociationHost SHARED
+        src/association_host_dll.cpp
+        src/association_host_dll.def
+    )
+    set_target_properties(DfaAssociationHost PROPERTIES
+        OUTPUT_NAME "DfaAssociationHost-${DFA_HOST_ARCH}"
+    )
+    target_link_libraries(DfaAssociationHost PRIVATE dfa_core)
+    if(MSVC)
+        target_compile_options(DfaAssociationHost PRIVATE /W4 /permissive- /utf-8)
+    endif()
+
+    find_program(DFA_CSC_EXECUTABLE NAMES csc.exe
+        PATHS
+            "$ENV{SystemRoot}/Microsoft.NET/Framework64/v4.0.30319"
+            "$ENV{SystemRoot}/Microsoft.NET/Framework/v4.0.30319"
+        NO_DEFAULT_PATH
+    )
+    if(NOT DFA_CSC_EXECUTABLE)
+        message(FATAL_ERROR "DFA_BUILD_HOST_BACKENDS requires the .NET Framework C# compiler (csc.exe).")
+    endif()
+    set(DFA_MANAGED_HOST_DLL "${CMAKE_CURRENT_BINARY_DIR}/DfaAssociationManagedHost-${DFA_HOST_ARCH}.dll")
+    file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/association_host_installer.cs" DFA_MANAGED_HOST_SOURCE)
+    file(TO_NATIVE_PATH "${DFA_MANAGED_HOST_DLL}" DFA_MANAGED_HOST_OUTPUT)
+    add_custom_command(
+        OUTPUT "${DFA_MANAGED_HOST_DLL}"
+        COMMAND "${DFA_CSC_EXECUTABLE}"
+            /nologo
+            /target:library
+            "/platform:${DFA_HOST_ARCH}"
+            /optimize+
+            /reference:System.Configuration.Install.dll
+            "/out:${DFA_MANAGED_HOST_OUTPUT}"
+            "${DFA_MANAGED_HOST_SOURCE}"
+        DEPENDS src/association_host_installer.cs
+        VERBATIM
+    )
+    add_custom_target(DfaAssociationManagedHost ALL DEPENDS "${DFA_MANAGED_HOST_DLL}")
+    add_dependencies(DefaultFileAssociation DfaAssociationHost DfaAssociationManagedHost)
+    add_custom_command(TARGET DefaultFileAssociation POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "$<TARGET_FILE:DfaAssociationHost>"
+            "$<TARGET_FILE_DIR:DefaultFileAssociation>/DfaAssociationHost-${DFA_HOST_ARCH}.dll"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${DFA_MANAGED_HOST_DLL}"
+            "$<TARGET_FILE_DIR:DefaultFileAssociation>/DfaAssociationManagedHost-${DFA_HOST_ARCH}.dll"
+        VERBATIM
+    )
+endif()
+
 option(DFA_BUILD_HOST_PROBES "Build the controlled PDF association host experiment" OFF)
 if(DFA_BUILD_HOST_PROBES)
     add_library(PdfAssociationHostProbe SHARED research/host-probes/native_host_probe.cpp research/host-probes/native_host_probe.def)
@@ -107,6 +165,14 @@ endif()
 install(TARGETS DefaultFileAssociation
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+if(DFA_BUILD_HOST_BACKENDS)
+    install(TARGETS DfaAssociationHost
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(FILES "${DFA_MANAGED_HOST_DLL}"
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
 
 if(BUILD_TESTING)
     # 测试使用临时键或进程内 HKCU 重定向；不会替换用户真实的 PDF 默认关联。
