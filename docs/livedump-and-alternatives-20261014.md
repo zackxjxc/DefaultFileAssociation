@@ -66,6 +66,37 @@ MSBuild、msiexec、InstallUtil、Regsvr32、ODBCConf 均不在这 14 项中。�
 
 复现脚本 `research/scripts/run_host_switch_tests.py` 需显式 --only 选择宿主，顺序执行、只读阶段失败跳过写入、发现防护事件停止并恢复。HTA/工作流编译器仍按先前结论排除。
 
+## 宿主输入与动态配置设计
+
+五种方案都由宿主加载并调用我们的代码，但输入形式和编译时机不同：
+
+| 宿主 | 提供给宿主的内容 | 编译时机 | 我们的执行入口 |
+| --- | --- | --- | --- |
+| 当前 MSBuild 实现 | XML 项目中内嵌的 C# 源码 | 运行时编译成托管程序集 | Task.Execute |
+| InstallUtil | C#/.NET 托管 DLL | 开发阶段预先编译 | Installer.Install 或 Uninstall；当前实验使用 Uninstall |
+| Regsvr32 | C++ 原生 DLL | 开发阶段预先编译 | DllRegisterServer |
+| ODBCConf | 同一个 C++ 原生 DLL与 REGSVR 配置指令 | 开发阶段预先编译 | DllRegisterServer |
+| msiexec | 同一个 C++ 原生 DLL | 开发阶段预先编译 | DllRegisterServer |
+
+MSBuild 当前执行路径是 C# 源码到 .NET 程序集，再由 CLR 加载和 JIT 执行；不是 C/C++ 编译 OBJ、链接成新 EXE 再启动。后四种都加载 DLL，但 InstallUtil 的托管 DLL与后三种的原生 DLL不是同一种构建产物。后三种可以共用现有原生研究 DLL。
+
+业务逻辑可以保持在固定 DLL 中，每次操作参数由本地 JSON 动态提供。以下是拟议配置格式，尚未实现：
+
+```json
+{
+  "extension": ".pdf",
+  "progId": "docboxtest.pdf",
+  "readerPath": "C:\\DFA Test\\DocBox.exe",
+  "iconIndex": 1
+}
+```
+
+拟议流程为：我们的 EXE 根据用户选择生成独立临时 JSON，通过子进程环境变量传递配置文件路径；宿主加载 DLL并调用约定入口；DLL读取并校验配置，执行设置并输出报告；我们的 EXE 独立检查有效关联后清理临时文件。环境变量适合 DllRegisterServer 这种没有自定义参数的入口，避免把配置直接拼入宿主命令行。
+
+当前 MSBuild 已动态接收 ProgID、操作模式和报告路径。其他宿主的研究 DLL 仍固定使用 docboxtest.pdf，尚未实现 JSON 参数化；本节只记录设计结论，没有修改实现。系统 DLL 指纹、内部函数地址和 HashVersion 支持范围仍由版本适配代码管理，增加配置文件不自动扩大 Windows 兼容范围。
+
+代码需要在宿主进程内实际执行。仅让 MSBuild 或另一个宿主启动我们的普通 EXE，写入进程身份仍是该 EXE，不能把父进程身份当作可继承的放行授权。
+
 ## 证据与后续方向
 
 原始内存、名单解析和 KD 日志保存在忽略目录 `research/evidence/livedump-20261014`；切换报告为 `research/evidence/host-probes/20261014-064912-32ad4e2c-switch-summary.json`。DMP 保留在桌面，没有上传或纳入 Git。

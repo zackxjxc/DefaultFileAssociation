@@ -1,0 +1,8 @@
+$$ Authored by Codex. Observe only. Attach to a matching OpenWith process with -pd.
+$$ WinUI3 SHA256: eafd3b32d36a0872ad55576dc13c2d43f7a707a63c6710170c8ee12ebd3b871a.
+$$ The module-relative breakpoint is valid only after verifying that fingerprint.
+bp Windows_Internal_OpenWithHost_WinUI3+0x5aa5c
+bu ntdll!NtSetValueKey ".if (wo(@rdx)==0xc) { .if (poi(poi(@rdx+8))==0x0067006f00720050) { .if (dwo(poi(@rdx+8)+8)==0x00640049) { .echo === PROGID_WRITE_ENTRY ===; du poi(@rdx+8); du poi(@rsp+0x28); !handle @rcx f; k 0x10 } .else { gc } } .else { gc } } .else { .if (wo(@rdx)==8) { .if (poi(poi(@rdx+8))==0x0068007300610048) { .echo === HASH_WRITE_ENTRY ===; du poi(@rdx+8); du poi(@rsp+0x28); !handle @rcx f; k 0x10 } .else { gc } } .else { gc } }"
+.echo === OPENWITH_UI_TRACE_ARMED ===
+bl
+g

@@ -205,6 +205,32 @@ research artifacts, not deployment recommendations. No further host execution
 tests should be run on the physical workstation; VM validation must retain
 Defender and record both association results and security detections.
 
+### Modes and UCPD boundary
+
+The repository contains several association and research modes, but it does
+not implement a UCPD bypass. UCPD remains enabled during testing; the project
+does not patch the driver, inject into a trusted process, spoof process
+identity, disable Defender, or change system protection settings.
+
+| Mode | Entry point | Status |
+| --- | --- | --- |
+| File extension | `--ext` | Per-user registration and verification; the legacy UserChoice path can be rejected by current Windows protection. |
+| Protocol | `--protocol` | Reuses an installed handler and verifies the effective Shell association. |
+| Browser | `--browser` | Resolves the selected application's registered HTTP, HTTPS, HTM, and HTML handlers. |
+| Framework64 MSBuild | `--msbuild` | Version-gated PDF experiment; requires Framework64 MSBuild, HashVersion 1, and an exact known `windows.storage.dll` fingerprint. |
+| Native latest-record probe | `--latest-native-probe` | Build-specific research probe; read-only validation is supported, while direct writing was denied on the tested host. |
+| Alternate hosts | `research/scripts/run_host_switch_tests.py` | Research-only comparisons for InstallUtil, Regsvr32, ODBCConf, and msiexec; these are not product backends. |
+| HTA/workflow compiler | historical fallback and experiments | Excluded from the current research plan because recent Windows/Defender tests rejected the route. |
+
+“Windows 11 26H2 UCPD 破解” is not a supported product claim. The tested
+profile is version-specific compatibility research. The current host build
+`26300.9711` has a read-only Hash validation profile in
+`research/scripts/check_latest_9711.py`, but the product intentionally refuses
+that new fingerprint for writes until a separate, normally authorized VM test
+establishes the complete behavior. The Framework64 MSBuild experiment therefore
+must not be described as a portable solution for the latest Windows 11 build.
+Unknown builds fail before internal addresses are called.
+
 See the [research checkpoint](docs/research-checkpoint-20261013.md) for confirmed
 results, hypotheses, and limits, and the [VM memory capture plan](docs/ucpd-vm-memory-capture-plan.md)
 for ways to inspect loaded policy. The supplied host live dump has now yielded
