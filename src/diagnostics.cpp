@@ -161,6 +161,58 @@ void DumpShell(std::wstring& output, const association::Specification& specifica
                           static_cast<DWORD>(status), command.empty() ? L"(none)" : command);
 }
 
+void DumpHashProfile(std::wstring& output, const association::Specification& specification,
+                     const platform::WindowsVersion& version, std::wstring_view sid) {
+    // 版本识别只读系统保护数据和 UserChoiceLatest 记录；它不会调用内部 Hash 函数，
+    // 也不会尝试写入任何关联键。OS build 只能选择旧算法时代，不能单独证明 Latest 已启用。
+    const auto legacy = crypto::SelectHashVersion(version);
+    output += L"legacy_hash_profile=" + std::wstring(crypto::HashVersionName(legacy)) + L"\n";
+    if (association::IsProtocol(specification.extension)) {
+        output += L"hash_profile=ProtocolUserChoice\n";
+        output += L"hash_profile_reason=UserChoiceLatest detection is limited to file extensions\n";
+        return;
+    }
+
+    const std::wstring protected_path =
+        L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\SystemProtectedUserData\\" +
+        std::wstring(sid) + L"\\AnyoneRead\\AppDefaults";
+    DWORD hash_version = 0;
+    DWORD type = 0;
+    DWORD size = sizeof(hash_version);
+    wil::unique_hkey protected_key;
+    const LSTATUS open_status = ::RegOpenKeyExW(HKEY_LOCAL_MACHINE, protected_path.c_str(), 0,
+        KEY_READ | KEY_WOW64_64KEY, protected_key.put());
+    const LSTATUS version_status = open_status == ERROR_SUCCESS
+        ? ::RegQueryValueExW(protected_key.get(), L"HashVersion", nullptr, &type,
+                              reinterpret_cast<BYTE*>(&hash_version), &size)
+        : open_status;
+    const std::wstring latest = association::ChoiceParent(specification.extension) + L"\\UserChoiceLatest";
+    const auto latest_hash = registry::ReadString(HKEY_CURRENT_USER, latest, L"Hash");
+    const auto latest_prog_id = registry::ReadString(HKEY_CURRENT_USER, latest + L"\\ProgId", L"ProgId");
+    const auto latest_time = registry::LastWriteTime(HKEY_CURRENT_USER, latest + L"\\ProgId");
+    const bool valid_version = version_status == ERROR_SUCCESS && type == REG_DWORD &&
+        size == sizeof(hash_version);
+    const bool latest_record_present = latest_hash && latest_prog_id && latest_time;
+    if (valid_version) {
+        output += std::format(L"latest_hash_version={}\n", hash_version);
+    } else {
+        output += std::format(L"latest_hash_version=unavailable,error={}\n", version_status);
+    }
+    if (valid_version && hash_version == 1 && latest_record_present) {
+        output += L"hash_profile=UserChoiceLatest\n";
+        output += L"hash_profile_reason=HashVersion=1 and UserChoiceLatest record is present\n";
+    } else if (valid_version && hash_version == 1) {
+        output += L"hash_profile=UserChoiceLatestPending\n";
+        output += L"hash_profile_reason=HashVersion=1 is present but the Latest record is incomplete\n";
+    } else if (latest_record_present) {
+        output += L"hash_profile=Unknown\n";
+        output += L"hash_profile_reason=UserChoiceLatest record exists without a validated HashVersion=1\n";
+    } else {
+        output += L"hash_profile=LegacyUserChoice\n";
+        output += L"hash_profile_reason=No validated UserChoiceLatest record was found\n";
+    }
+}
+
 } // namespace
 
 std::wstring Snapshot(const association::Specification& specification, bool query_shell) {
@@ -181,6 +233,7 @@ std::wstring Snapshot(const association::Specification& specification, bool quer
         version.major, version.minor, version.build, sizeof(void*) * 8,
         system.wProcessorArchitecture, sid, specification.extension, specification.prog_id,
         specification.update_association_toasts, specification.experimental_notify);
+    DumpHashProfile(output, specification, version, sid);
     output += std::format(L"association_type={}\nreuse_registered={}\n",
         association::IsProtocol(specification.extension) ? L"protocol" : L"file", specification.reuse_registered);
     DumpKey(output, HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows NT\\CurrentVersion", L"HKLM");

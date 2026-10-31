@@ -12,4 +12,4 @@ All notable changes to this project are recorded here. Release archives include 
 - Add PDF, protocol, and installed-browser association modes.
 - Add version-gated Framework64 MSBuild PDF research mode and read-only diagnostics.
 - Add bilingual README files and tag-triggered Windows build packaging.
-- Document the six tested association research paths and their Windows 11 26H2 limitations.
+- Document five tested host research paths and their Windows 11 26H2 limitations.

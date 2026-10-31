@@ -209,20 +209,29 @@ Defender and record both association results and security detections.
 
 ### Modes and UCPD boundary
 
-The repository contains several association and research modes, but it does
-not implement a UCPD bypass. UCPD remains enabled during testing; the project
-does not patch the driver, inject into a trusted process, spoof process
-identity, disable Defender, or change system protection settings.
+The executable provides one user-level association API for file extensions,
+protocols, and installed browsers. Five host-based routes have been recorded as
+research comparisons for protected default-association writes:
 
-| Mode | Entry point | Status |
-| --- | --- | --- |
-| File extension | `--ext` | Per-user registration and verification; the legacy UserChoice path can be rejected by current Windows protection. |
-| Protocol | `--protocol` | Reuses an installed handler and verifies the effective Shell association. |
-| Browser | `--browser` | Resolves the selected application's registered HTTP, HTTPS, HTM, and HTML handlers. |
-| Framework64 MSBuild | `--msbuild` | Version-gated PDF experiment; requires Framework64 MSBuild, HashVersion 1, and an exact known `windows.storage.dll` fingerprint. |
-| Native latest-record probe | `--latest-native-probe` | Build-specific research probe; read-only validation is supported, while direct writing was denied on the tested host. |
-| Alternate hosts | `research/scripts/run_host_switch_tests.py` | Research-only comparisons for InstallUtil, Regsvr32, ODBCConf, and msiexec; these are not product backends. |
-| HTA/workflow compiler | historical fallback and experiments | Excluded from the current research plan because recent Windows/Defender tests rejected the route. |
+1. Framework64 MSBuild;
+2. InstallUtil;
+3. Regsvr32;
+4. ODBCConf;
+5. msiexec.
+
+These are research observations, not a UCPD bypass selector or product backends.
+The repository does not patch UCPD, inject into a trusted process, spoof process
+identity, disable Defender, or change system protection settings. HTA and the
+workflow compiler are excluded after security detections. The native
+`--latest-native-probe` is a separate, version-gated probe and its read-only
+validation must not be confused with a supported setter.
+
+The `--diagnose` output reports both hash layers without writing them:
+`legacy_hash_profile` identifies the legacy, Windows 10 Threshold 1, or
+Threshold 2-and-later algorithm selected from the OS version; `latest_hash_version`
+and `hash_profile` identify a validated `UserChoiceLatest` record. A latest
+record is recognized only when the protected `HashVersion` value and the record
+shape are both present. An OS build number alone is not enough.
 
 “Windows 11 26H2 UCPD 破解” is not a supported product claim. The tested
 profile is version-specific compatibility research. The current host build

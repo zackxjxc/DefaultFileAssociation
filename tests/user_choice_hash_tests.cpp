@@ -59,6 +59,12 @@ void TestUserChoiceHash() {
     Require(dfa::crypto::SelectHashVersion({10, 0, 10587}) ==
                 dfa::crypto::HashVersion::Windows10Threshold2OrLater,
             "Post-1511 boundary");
+    Require(dfa::crypto::HashVersionName(dfa::crypto::HashVersion::Legacy) == L"Legacy" &&
+                dfa::crypto::HashVersionName(dfa::crypto::HashVersion::Windows10Threshold1) ==
+                    L"Windows10Threshold1" &&
+                dfa::crypto::HashVersionName(dfa::crypto::HashVersion::Windows10Threshold2OrLater) ==
+                    L"Windows10Threshold2OrLater",
+            "Hash version names");
 
     const dfa::platform::WindowsVersion windows10_1507{10, 0, 10240};
     const auto threshold1 = dfa::crypto::GenerateUserChoiceHash(

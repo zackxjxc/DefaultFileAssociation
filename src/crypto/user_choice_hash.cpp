@@ -154,6 +154,18 @@ HashVersion SelectHashVersion(const platform::WindowsVersion& version) noexcept 
                                   : HashVersion::Windows10Threshold2OrLater;
 }
 
+std::wstring_view HashVersionName(HashVersion version) noexcept {
+    switch (version) {
+    case HashVersion::Legacy:
+        return L"Legacy";
+    case HashVersion::Windows10Threshold1:
+        return L"Windows10Threshold1";
+    case HashVersion::Windows10Threshold2OrLater:
+        return L"Windows10Threshold2OrLater";
+    }
+    return L"Unknown";
+}
+
 HashResult GenerateUserChoiceHash(
     const std::wstring& extension,
     const std::wstring& prog_id,

@@ -89,17 +89,17 @@ DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreade
 
 ### 模式与 UCPD 边界
 
-本仓库包含多个关联和研究模式，但**没有实现 UCPD 绕过**。测试时保持 UCPD 和 Defender 开启；项目不修改驱动、不向受信任进程注入、不伪造进程身份，也不改变系统保护设置。
+程序提供一个用户级默认关联接口，支持文件扩展名、协议和已安装浏览器。研究记录中有五类宿主对照路径：
 
-| 模式 | 入口 | 状态 |
-| --- | --- | --- |
-| 文件扩展名 | `--ext` | 用户级注册和验证；新版 Windows 可能拒绝旧 UserChoice 路径。 |
-| 协议 | `--protocol` | 复用已安装处理器并验证有效 Shell 关联。 |
-| 浏览器 | `--browser` | 解析所选应用注册的 HTTP、HTTPS、HTM、HTML 处理器。 |
-| Framework64 MSBuild | `--msbuild` | 版本受限的 PDF 实验；要求 Framework64 MSBuild、HashVersion 1 和已知 DLL 指纹。 |
-| Native 最新记录探针 | `--latest-native-probe` | 特定构建研究探针；支持只读验证，已测试主机上的直接写入被拒绝。 |
-| 其他宿主 | `research/scripts/run_host_switch_tests.py` | InstallUtil、Regsvr32、ODBCConf、msiexec 的研究对照，不属于产品后端。 |
-| HTA/工作流编译器 | 历史回退和实验 | 因近期 Windows/Defender 测试被拒绝，已排除。 |
+1. Framework64 MSBuild；
+2. InstallUtil；
+3. Regsvr32；
+4. ODBCConf；
+5. msiexec。
+
+这五类是研究对照，不是 UCPD 绕过选择器，也不是产品后端。项目不修改 UCPD 驱动、不向受信任进程注入、不伪造进程身份、不关闭 Defender，也不改变系统保护设置。HTA 和工作流编译器路线因安全检测已排除。`--latest-native-probe` 是独立的版本受限探针，只读验证不能等同于受支持的设置接口。
+
+`--diagnose` 会在不写入的情况下报告两层 Hash：`legacy_hash_profile` 表示根据系统版本选择的 Legacy、Windows 10 Threshold 1 或 Threshold 2 及以上算法；`latest_hash_version` 和 `hash_profile` 表示是否检测到经过验证的 `UserChoiceLatest` 记录。只有受保护的 `HashVersion` 值和记录结构同时存在时，才认为新结构已启用；不能只根据 OS build 判断。
 
 “Windows 11 26H2 UCPD 破解”不是本项目支持的产品声明。当前主机 `26300.9711` 只有只读 Hash 校验脚本；产品会拒绝调用尚未完成验证的新写入指纹。Framework64 MSBuild 实验也不能描述为最新 Windows 11 的通用方案。未知构建会在调用内部地址前失败。
 

@@ -15,6 +15,10 @@ enum class HashVersion {
     Windows10Threshold2OrLater,
 };
 
+// 仅描述旧 UserChoice Hash 的算法时代；UserChoiceLatest/HashVersion=1
+// 是另一套存储结构和系统内部算法，不归入这个枚举。
+[[nodiscard]] std::wstring_view HashVersionName(HashVersion version) noexcept;
+
 struct HashResult {
     bool ok = false;
     std::wstring value;
