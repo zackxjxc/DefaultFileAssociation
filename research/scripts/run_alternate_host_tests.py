@@ -57,7 +57,7 @@ def main():
             log.write_bytes((error.stdout or b"") + (error.stderr or b""))
             return "timeout"
     def check(label):
-        return invoke(checker, ["--latest-native-probe", "--ext=.pdf", "--prog-id=docboxtest.pdf", "--check"],
+        return invoke(checker, ["--latest-native-probe", "--ext=.pdf", "--prog-id=samplepdfreader.pdf", "--check"],
                       logs / (stamp + "-" + label + "-independent-check.log"))
     if check("initial") != 0:
         raise RuntimeError("Initial PDF hash/Shell validation failed; no host write tests attempted")

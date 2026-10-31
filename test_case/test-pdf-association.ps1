@@ -13,9 +13,9 @@ if (Get-Variable PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyCo
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $associationTool = Join-Path $projectRoot 'out\build\windows-x86-v143\Release\DefaultFileAssociation.exe'
-$readerExecutable = Join-Path $PSScriptRoot 'DocBox.exe'
+$readerExecutable = Join-Path $PSScriptRoot 'SamplePdfReader.exe'
 $extension = '.pdf'
-$progId = 'docboxtest.pdf'
+$progId = 'samplepdfreader.pdf'
 
 foreach ($requiredFile in @($associationTool, $readerExecutable)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
@@ -49,7 +49,7 @@ function Get-AssociationState {
         UserChoiceHash = Read-UserRegistryString $choiceKey 'Hash'
         ClassesProgId = Read-UserRegistryString 'Software\Classes\.pdf'
         ExplorerProgId = Read-UserRegistryString 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf' 'ProgId'
-        RegisteredOpenCommand = Read-UserRegistryString 'Software\Classes\docboxtest.pdf\shell\open\command'
+        RegisteredOpenCommand = Read-UserRegistryString 'Software\Classes\samplepdfreader.pdf\shell\open\command'
     }
 }
 
@@ -79,7 +79,7 @@ Write-Host "Results: $runDirectory"
 
 $setExit = $null
 if (-not $CheckOnly) {
-    $setArguments = @("--ext=$extension", "--exe-path=$readerExecutable", "--prog-id=$progId", '--description=DocBox Test PDF')
+    $setArguments = @("--ext=$extension", "--exe-path=$readerExecutable", "--prog-id=$progId", '--description=SamplePdfReader Test PDF')
     $setExit = Invoke-AssociationTool 'set' $setArguments
     # Give Explorer time to receive the change notification before querying again.
     Start-Sleep -Seconds 2

@@ -85,7 +85,7 @@
 上方版本矩阵保留为旧方案的历史结果，修复后的逐版本结果尚待回归验证。
 
 新版 `vm-first-use-v2` 默认采用选项 2。建议先从干净快照重新验证一次默认方案，
-保留 `register_docbox_pdf.bat` 生成的日志；不要求重新执行全部四组选项。
+保留 `register_samplepdfreader_pdf.bat` 生成的日志；不要求重新执行全部四组选项。
 
 ## WIN10-1809-PDF-002：修复版默认流程首次打开通过
 
@@ -95,7 +95,7 @@
 | 信息来源 | 用户报告“一次成功”，并提供完整设置及首次双击后诊断日志 |
 | 操作系统 | Windows 10 Education，1809，64 位，build 17763，UBR 1（17763.1） |
 | 工具标识 | `vm-first-use-v2` |
-| 使用方式 | 普通设置命令，不传 `--experiment`，目标 ProgID 为 `DocBox.pdf`，图标索引为 1 |
+| 使用方式 | 普通设置命令，不传 `--experiment`，目标 ProgID 为 `SamplePdfReader.pdf`，图标索引为 1 |
 | 证据日志 | `dfa-default-7610-21106.log`，已读取核对；原日志不复制进开源仓库 |
 | 测试结果 | **通过，用户报告首次操作即成功** |
 
@@ -103,7 +103,7 @@
 
 - UserChoice 已存在，指向旧版 Edge 的 `AppXd4nrz8ff68srnhf9t5a8sbjyar1cr723`，重算 Hash 匹配。
 - PDF 的 OpenWithList 无值，FileExts 下的 OpenWithProgids 不存在。
-- `DocBox.pdf` 的注册项不存在，ApplicationAssociationToasts 中没有 `.pdf` 对应的记录。
+- `SamplePdfReader.pdf` 的注册项不存在，ApplicationAssociationToasts 中没有 `.pdf` 对应的记录。
 
 这说明“尚未手动打开过 PDF”不等于“没有 UserChoice”。该环境已预置有效的 Edge 默认关联，
 缺失的是 PDF 相关确认记录，而不是完全没有默认 ProgID 或已有 Hash 无效。
@@ -111,11 +111,11 @@
 ### 设置及首次双击后的证据
 
 - 设置退出码为 0，默认启用确认记录补齐，未启用同步通知等待实验。
-- 新增两项 DWORD 0：`AppXd4nrz8ff68srnhf9t5a8sbjyar1cr723_.pdf` 和 `DocBox.pdf_.pdf`。
-- UserChoice 更新为 `DocBox.pdf`，Hash 重算匹配；Shell 的有效 ProgID 和打开命令均指向 DocBox。
-- 首次双击后的快照中，UserChoice 的 ProgID、Hash 与最后写入时间均保持不变，Shell 查询仍指向 DocBox。
-- 首次双击后系统建立了 `OpenWithList` 的 `docbox.exe` / MRUList，以及 FileExts 下的 `DocBox.pdf` OpenWithProgids 项。
+- 新增两项 DWORD 0：`AppXd4nrz8ff68srnhf9t5a8sbjyar1cr723_.pdf` 和 `SamplePdfReader.pdf_.pdf`。
+- UserChoice 更新为 `SamplePdfReader.pdf`，Hash 重算匹配；Shell 的有效 ProgID 和打开命令均指向 SamplePdfReader。
+- 首次双击后的快照中，UserChoice 的 ProgID、Hash 与最后写入时间均保持不变，Shell 查询仍指向 SamplePdfReader。
+- 首次双击后系统建立了 `OpenWithList` 的 `samplepdfreader.exe` / MRUList，以及 FileExts 下的 `SamplePdfReader.pdf` OpenWithProgids 项。
 
 用户的实际打开结果与日志校验一致，1809 的这个环境可记为通过。
 结合此前选项 2/3/4 的对照，支持默认补齐确认记录、无需额外等待的处理方式。
-当前同时补写了 Edge 与 DocBox 两项，尚不能区分其中哪一项单独足以修复；其他版本仍需分别回归。
+当前同时补写了 Edge 与 SamplePdfReader 两项，尚不能区分其中哪一项单独足以修复；其他版本仍需分别回归。

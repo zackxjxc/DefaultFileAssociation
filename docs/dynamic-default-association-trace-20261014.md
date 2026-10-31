@@ -9,7 +9,7 @@
 | 模块与 RVA | 对应静态函数 | 运行时证据 |
 | --- | --- | --- |
 | Windows.UI.AppDefaults.dll + `0x2C350` | `AssociationSetting::Invoke` | 调试器线程索引 `0:002` 命中，调用栈来自 SystemSettingsViewModel 和 Windows.UI.Xaml |
-| 同模块 + `0x292DC` | 负责关联操作的后台 lambda | 线程索引切到 `0:043`，调用栈来自 SHCORE 工作线程；对象字段读出 `docboxtest.pdf` 和 `.pdf` |
+| 同模块 + `0x292DC` | 负责关联操作的后台 lambda | 线程索引切到 `0:043`，调用栈来自 SHCORE 工作线程；对象字段读出 `samplepdfreader.pdf` 和 `.pdf` |
 | 同模块 + `0x2CFE4` | `SHExtCoCreateLocalServerFromRegKey` | 在同一工作线程命中，调用者返回位置为模块 + `0x295C5`；恢复执行后出现 OpenWith 选择框 |
 
 在第一个断点执行 `p` 后，RIP 从函数起点推进 5 字节，到下一条 `push rbp`。因此这是实际暂停和单步执行，不只是进程活动监控。CDB 缺少该模块的完整符号时显示 `GetSetting+偏移`；上述函数名来自同一 SHA-256 文件的 IDA 分析，不能照抄 CDB 最近导出符号作为真实函数名。
@@ -82,4 +82,4 @@ Windows.UI.AppDefaults.dll、OpenWith.exe、WinUI3 选择组件和 UCPD.sys 的�
 
 IDA 新文件分析期间获取公共 PDB 的 HTTP 连接被重置；IDA 仍完成了函数识别与反编译，43,751 个函数、2 个目标函数导出。没有把 PDB 获取失败视为不存在这些函数。
 
-结束时只读 Hash 检查退出码为 0，写入数为 0；产品 `--diagnose` 退出码为 0，Shell 有效 ProgID 仍为 `docboxtest.pdf`，打开命令仍指向 `test_case\DocBox.exe`。初始和结束时 PDF 新格式关联值相同；本轮没有完成新的系统默认应用确认。
+结束时只读 Hash 检查退出码为 0，写入数为 0；产品 `--diagnose` 退出码为 0，Shell 有效 ProgID 仍为 `samplepdfreader.pdf`，打开命令仍指向 `test_case\SamplePdfReader.exe`。初始和结束时 PDF 新格式关联值相同；本轮没有完成新的系统默认应用确认。

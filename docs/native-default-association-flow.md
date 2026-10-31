@@ -124,4 +124,4 @@ RVA 0x1667C 组合映像信任、允许名单、拒绝名单、OriginalFilename 
 
 IDA 取得 Windows.UI.AppDefaults/OpenWith/WinUI3 选择组件的微软公共 PDB，符号名有助于还原上述函数；没有完整私有类型，部分反编译参数仍不可靠，不能拿伪代码直接当作调用 ABI。WinUI3 的符号通过微软 HTTPS 符号服务器取得并缓存；SystemSettings 符号获取失败，已停止相关可选分析，没有把失败当作不存在功能。Lumina 保持本地拒绝连接设置，不上传系统文件。系统副本、PDB、IDA 数据库和原始导出保持本地忽略，不纳入 Git。
 
-结束时运行原生 `--latest-native-probe --check`，只读 Hash/Shell 检查返回 0、completed_registry_writes=0，PDF 仍为 docboxtest.pdf；结果在 `final-native-readonly-check.log`。本轮分析脚本 AST、文档链接、编码/换行和 Git diff 检查均通过，未修改产品设置代码。
+结束时运行原生 `--latest-native-probe --check`，只读 Hash/Shell 检查返回 0、completed_registry_writes=0，PDF 仍为 samplepdfreader.pdf；结果在 `final-native-readonly-check.log`。本轮分析脚本 AST、文档链接、编码/换行和 Git diff 检查均通过，未修改产品设置代码。

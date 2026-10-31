@@ -74,7 +74,7 @@ The executable accepts UTF-16 Windows command-line arguments. The names with
 underscores are retained as compatibility aliases for the original tool.
 
 ```text
-DefaultFileAssociation.exe --ext=.pdf --exe-path="C:\Users\hudening\AppData\Local\Programs\DocBox\DocBox.exe" --icon-index=3 --prog-id=docbox
+DefaultFileAssociation.exe --ext=.pdf --exe-path="C:\Users\hudening\AppData\Local\Programs\SamplePdfReader\SamplePdfReader.exe" --icon-index=3 --prog-id=samplepdfreader
 ```
 
 Important options:
@@ -86,13 +86,13 @@ Important options:
   Windows uses the executable's default icon. `--icon-path` can point to a
   separate `.ico`, `.exe`, or `.dll` resource file.
 * `--prog-id` is the registry ProgID. If omitted, the tool derives one from the
-  executable stem and extension (for example `DocBox.pdf`).
+  executable stem and extension (for example `SamplePdfReader.pdf`).
 * `--description` controls the friendly name shown by Windows. It defaults to
   the executable stem.
 * `--no-hta` disables the Windows 10/11 HTA compatibility fallback.
 * `--dry-run` validates and prints the request without changing the registry.
-* `--check --ext=.pdf --prog-id=docbox` verifies the current association.
-* `--diagnose --ext=.pdf --prog-id=docbox` collects read-only registry and Shell
+* `--check --ext=.pdf --prog-id=samplepdfreader` verifies the current association.
+* `--diagnose --ext=.pdf --prog-id=samplepdfreader` collects read-only registry and Shell
   diagnostics; a zero exit code means collection completed, not that the default works.
 * `--log-file=run.log` appends UTF-8 output and before/after diagnostic snapshots.
 * `--experiment=default|none|toasts|notify|toasts-notify` selects first-use VM
@@ -183,9 +183,9 @@ sets the new-format record, and verifies its Hash plus the effective Shell handl
 The default icon index in this mode is **1**. The legacy path remains separate.
 
 ```powershell
-DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=docboxtest.pdf
-DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=docboxtest.pdf --exe-path="C:\Apps\DocBox.exe" --icon-index=1 --log-file=set.log
-DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=docboxtest.pdf
+DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe" --icon-index=1 --log-file=set.log
+DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreader.pdf
 ```
 
 This requires 64-bit Windows, Framework64 MSBuild, HashVersion 1, and one of two
@@ -232,6 +232,20 @@ that new fingerprint for writes until a separate, normally authorized VM test
 establishes the complete behavior. The Framework64 MSBuild experiment therefore
 must not be described as a portable solution for the latest Windows 11 build.
 Unknown builds fail before internal addresses are called.
+
+## Release packaging
+
+The GitHub Actions workflow runs on tags matching `vMAJOR.MINOR.PATCH`. It
+builds x86 and x64 Release binaries with the v143 toolset, runs the x86 CTest
+suite, creates a reproducible Windows ZIP archive, and publishes a GitHub
+Release. The archive includes both README languages, the license files, VM
+instructions, checksums, and the release notes for that tag.
+
+Add the user-visible changes to `CHANGELOG.md` and, for a dedicated bilingual
+release description, add `docs/releases/vX.Y.Z.md` before pushing the tag. The
+packaging script reads that version-specific file first and stores it as
+`RELEASE_NOTES.md` in the archive. Local reader samples are optional and are
+never required by the CI build.
 
 See the [research checkpoint](docs/research-checkpoint-20261013.md) for confirmed
 results, hypotheses, and limits, and the [VM memory capture plan](docs/ucpd-vm-memory-capture-plan.md)

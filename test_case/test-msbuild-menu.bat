@@ -7,7 +7,7 @@ if not exist "%~dp0test-msbuild-package.ps1" goto missing
 echo.
 echo ===== PDF 默认打开方式测试 =====
 echo 1. 兼容性预检（不修改设置）
-echo 2. 设置包内 DocBox 为 PDF 默认程序（图标序号 1）
+echo 2. 设置包内 SamplePdfReader 为 PDF 默认程序（图标序号 1）
 echo 3. 只读复查设置结果
 echo 0. 退出
 echo.

@@ -28,7 +28,7 @@ constexpr std::wstring_view kFileExts =
     L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\";
 
 std::wstring FormatIcon(const Specification& specification) {
-    // 结果示例："C:\Apps\DocBox\DocBox.exe",1；独立 ICO 则为 "C:\Icons\pdf.ico"。
+    // 结果示例："C:\Apps\SamplePdfReader\SamplePdfReader.exe",1；独立 ICO 则为 "C:\Icons\pdf.ico"。
     // 这是 DefaultIcon 的字符串值，不是一个把“,1”包含在文件名中的磁盘路径。
     const auto& icon = specification.icon_path.empty()
         ? specification.executable : specification.icon_path;
@@ -40,7 +40,7 @@ std::wstring FormatIcon(const Specification& specification) {
 }
 
 std::wstring OpenCommand(const Specification& specification) {
-    // 结果示例："C:\Apps\DocBox\DocBox.exe" "%1" %*。
+    // 结果示例："C:\Apps\SamplePdfReader\SamplePdfReader.exe" "%1" %*。
     // %1 由 Shell 替换为待打开文件，%* 传递附加参数；路径加引号以保留空格。
     return std::format(L"{} \"%1\" %*",
                        platform::QuoteCommandLineArgument(specification.executable.wstring()));
@@ -83,7 +83,7 @@ registry::Result<void> WriteAssociationToasts(const Specification& specification
     // 首次打开时可能仍有候选应用确认提示；只补齐当前扩展名的确认记录。
     // ext=.pdf 时，下面依次读取三个索引：
     // HKCR\.pdf\OpenWithProgids：值名称就是候选 ProgID。
-    // HKCR\.pdf\OpenWithList：子键如 docbox.exe，被补成 Applications\docbox.exe。
+    // HKCR\.pdf\OpenWithList：子键如 samplepdfreader.exe，被补成 Applications\samplepdfreader.exe。
     // HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\OpenWithProgids。
     // HKCR 是合并后的 Classes 视图，此处仅用于读取；写入仍只发生在 HKCU。
     for (auto result : {
@@ -104,7 +104,7 @@ registry::Result<void> WriteAssociationToasts(const Specification& specification
     }
     for (const auto& candidate : candidates) {
         // 完整键：HKCU\Software\Microsoft\Windows\CurrentVersion\ApplicationAssociationToasts。
-        // 值名称按 <ProgID>_<带点扩展名> 拼接，例如 DocBox.pdf_.pdf，类型 DWORD，数据 0。
+        // 值名称按 <ProgID>_<带点扩展名> 拼接，例如 SamplePdfReader.pdf_.pdf，类型 DWORD，数据 0。
         // 这是兼容性确认记录；1809 首次打开已实测，其余版本仍以实际验证为准。
         auto written = registry::SetDword(HKEY_CURRENT_USER,
             L"Software\\Microsoft\\Windows\\CurrentVersion\\ApplicationAssociationToasts",
@@ -223,11 +223,11 @@ Result RegisterCandidate(const Specification& specification) {
         NotifyShell(specification.experimental_notify);
         return {Status::RegisteredOnly, L"Reusing the installed application's registration.", 0, false};
     }
-    // 以 ext=.pdf、prog_id=DocBox.pdf 为例，四个完整注册表键为：
-    // prog_key：HKCU\Software\Classes\DocBox.pdf。
+    // 以 ext=.pdf、prog_id=SamplePdfReader.pdf 为例，四个完整注册表键为：
+    // prog_key：HKCU\Software\Classes\SamplePdfReader.pdf。
     // extension_key：HKCU\Software\Classes\.pdf。
     // file_ext_key：HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf。
-    // capabilities：HKCU\Software\DefaultFileAssociation\DocBox.pdf\Capabilities。
+    // capabilities：HKCU\Software\DefaultFileAssociation\SamplePdfReader.pdf\Capabilities。
     const std::wstring prog_key = std::wstring(kClasses) + specification.prog_id;
     const std::wstring extension_key = std::wstring(kClasses) + specification.extension;
     const std::wstring file_ext_key = std::wstring(kFileExts) + specification.extension;
@@ -240,9 +240,9 @@ Result RegisterCandidate(const Specification& specification) {
     };
     // 只注册通用的 open 动作，不把原阅读器的打印参数强加给其他程序。
     // prog_key 下的 DefaultIcon、Application、shell\open\command 分别描述图标、应用与启动命令。
-    // 例如命令最终位于 HKCU\Software\Classes\DocBox.pdf\shell\open\command 的默认值。
-    // capabilities\FileAssociations 的“.pdf”值指向 DocBox.pdf；RegisteredApplications 中的
-    // “DocBox.pdf”值保存相对路径 Software\DefaultFileAssociation\DocBox.pdf\Capabilities。
+    // 例如命令最终位于 HKCU\Software\Classes\SamplePdfReader.pdf\shell\open\command 的默认值。
+    // capabilities\FileAssociations 的“.pdf”值指向 SamplePdfReader.pdf；RegisteredApplications 中的
+    // “SamplePdfReader.pdf”值保存相对路径 Software\DefaultFileAssociation\SamplePdfReader.pdf\Capabilities。
     // FileExts\.pdf 的 Progid 是旧式辅助记录，不能代替 Win8+ 的 UserChoice。
     const StringEntry entries[] = {
         {prog_key, L"", specification.description},
@@ -265,7 +265,7 @@ Result RegisterCandidate(const Specification& specification) {
             return Failure(result.error(), entry.key + L" [" + entry.name + L"]");
         }
     }
-    // 实际键 HKCU\Software\Classes\.pdf\OpenWithProgids，值名称 DocBox.pdf。
+    // 实际键 HKCU\Software\Classes\.pdf\OpenWithProgids，值名称 SamplePdfReader.pdf。
     // REG_NONE 空数据把程序列为候选，不表示它已经成为默认程序。
     auto open_with = registry::SetEmptyValue(HKEY_CURRENT_USER,
                                              extension_key + L"\\OpenWithProgids",

@@ -152,8 +152,8 @@ bool EqualsInsensitive(std::wstring_view left, std::wstring_view right) noexcept
 }
 
 std::wstring QuoteCommandLineArgument(std::wstring_view value) {
-    // 为 Windows 参数生成一个完整带引号的字符串，例如 C:\Apps\Doc Box\DocBox.exe
-    // 变成 "C:\Apps\Doc Box\DocBox.exe"；这里只编码参数，不解析或访问文件。
+    // 为 Windows 参数生成一个完整带引号的字符串，例如 C:\Apps\Sample Reader\SamplePdfReader.exe
+    // 变成 "C:\Apps\Sample Reader\SamplePdfReader.exe"；这里只编码参数，不解析或访问文件。
     // 引号前和参数结尾的反斜杠需要按 Windows 参数规则加倍，不能简单在两端加引号。
     std::wstring result;
     result.reserve(value.size() + 2);

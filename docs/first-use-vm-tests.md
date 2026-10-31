@@ -12,9 +12,9 @@
 
 ## 文件与准备
 
-测试包包含 `DefaultFileAssociation.exe`、中文 `register_docbox_pdf.bat`、中文 `test_pdf_default.bat` 和本说明。
-把它们放到虚拟机中原来含有 `docbox.exe` 的文件夹，保留阅读器所需的 DLL 和其他文件。
-普通权限运行 BAT；PDF 图标仍使用从原阅读器确认的索引 `1`，ProgID 为 `DocBox.pdf`。
+测试包包含 `DefaultFileAssociation.exe`、中文 `register_samplepdfreader_pdf.bat`、中文 `test_pdf_default.bat` 和本说明。
+把它们放到虚拟机中原来含有 `samplepdfreader.exe` 的文件夹，保留阅读器所需的 DLL 和其他文件。
+普通权限运行 BAT；PDF 图标仍使用从原阅读器确认的索引 `1`，ProgID 为 `SamplePdfReader.pdf`。
 
 首先建立一个快照：已进入桌面，但从未双击 PDF、从未在系统界面为 PDF 选择默认应用。
 **每个实验都从这个快照恢复，不能直接在前一个实验上继续运行另一个实验。**
@@ -22,7 +22,7 @@
 
 ## 本轮建议：只验证新版默认方案
 
-不需要把四组全部重测。恢复上述干净快照后，运行 `register_docbox_pdf.bat`。
+不需要把四组全部重测。恢复上述干净快照后，运行 `register_samplepdfreader_pdf.bat`。
 它不传实验参数，直接使用默认的确认记录补齐流程，并记录设置前后与第一次双击后的状态。
 若出现选择列表，请先不要选择应用，返回 BAT 按键采集日志。
 把生成的 `dfa-default-*.log` 和首次双击表现返回即可。
@@ -71,14 +71,14 @@
 设置后的查询可能影响 Shell 缓存；如果选项 1 加日志后不再复现，需要恢复快照，先执行下面的无日志基线命令，双击后再单独诊断。
 
 ```bat
-DefaultFileAssociation.exe --ext=.pdf --exe-path="%CD%\docbox.exe" --prog-id=DocBox.pdf --icon-index=1 --experiment=none
-DefaultFileAssociation.exe --diagnose --ext=.pdf --prog-id=DocBox.pdf --log-file=after-first-open.log
+DefaultFileAssociation.exe --ext=.pdf --exe-path="%CD%\samplepdfreader.exe" --prog-id=SamplePdfReader.pdf --icon-index=1 --experiment=none
+DefaultFileAssociation.exe --diagnose --ext=.pdf --prog-id=SamplePdfReader.pdf --log-file=after-first-open.log
 ```
 
 也可随时只采集一份快照，日志会追加，不覆盖此前内容：
 
 ```bat
-DefaultFileAssociation.exe --diagnose --ext=.pdf --prog-id=DocBox.pdf --log-file=manual-snapshot.log
+DefaultFileAssociation.exe --diagnose --ext=.pdf --prog-id=SamplePdfReader.pdf --log-file=manual-snapshot.log
 ```
 
 ## 本地自动测试范围

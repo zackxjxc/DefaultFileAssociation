@@ -88,8 +88,8 @@ bool NormalizeExtension(std::wstring& value) {
 using association::IsValidProgId;
 
 std::wstring DefaultProgId(const Options& options) {
-    // C:\Apps\DocBox\DocBox.exe 的 stem 是 DocBox；ext=.pdf 去掉点后是 pdf。
-    // 拼接的结果是 ProgID“DocBox.pdf”，它是注册表标识，不是磁盘路径或 EXE 文件名。
+    // C:\Apps\SamplePdfReader\SamplePdfReader.exe 的 stem 是 SamplePdfReader；ext=.pdf 去掉点后是 pdf。
+    // 拼接的结果是 ProgID“SamplePdfReader.pdf”，它是注册表标识，不是磁盘路径或 EXE 文件名。
     // 中文等不允许进入当前 ProgID 字符集的字符替换为下划线；不截断长标识以免产生冲突。
     auto sanitize = [](std::wstring value) {
         for (auto& character : value) {

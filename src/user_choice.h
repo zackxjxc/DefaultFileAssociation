@@ -7,7 +7,7 @@
 namespace dfa::user_choice {
 
 struct Request {
-    // 例如 .pdf + DocBox.pdf；SID 和系统版本由当前进程获取，调用方不能指定另一个用户。
+    // 例如 .pdf + SamplePdfReader.pdf；SID 和系统版本由当前进程获取，调用方不能指定另一个用户。
     std::wstring extension;
     std::wstring prog_id;
     bool use_hta = true;

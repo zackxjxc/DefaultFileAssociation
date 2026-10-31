@@ -40,7 +40,7 @@ x86 工具可以在 64 位 Windows 上注册 x86 或 x64 阅读器；在 32 位 
 程序接收 UTF-16 Windows 命令行参数，并保留带下划线的旧参数别名：
 
 ```text
-DefaultFileAssociation.exe --ext=.pdf --exe-path="C:\Apps\DocBox\DocBox.exe" --icon-index=1 --prog-id=docboxtest.pdf
+DefaultFileAssociation.exe --ext=.pdf --exe-path="C:\Apps\SamplePdfReader\SamplePdfReader.exe" --icon-index=1 --prog-id=samplepdfreader.pdf
 ```
 
 常用选项：
@@ -78,9 +78,9 @@ DefaultFileAssociation.exe --browser="Google Chrome" --check
 EXE 内嵌了 Framework64 MSBuild PDF 实验后端。使用 `--msbuild` 时，程序会先进行版本兼容性检查，再注册候选程序、写入新格式记录，并验证 Hash 与有效 Shell 处理器。该模式的默认图标序号是 **1**：
 
 ```powershell
-DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=docboxtest.pdf
-DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=docboxtest.pdf --exe-path="C:\Apps\DocBox.exe" --icon-index=1 --log-file=set.log
-DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=docboxtest.pdf
+DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe" --icon-index=1 --log-file=set.log
+DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreader.pdf
 ```
 
 该模式要求 64 位 Windows、Framework64 MSBuild、HashVersion 1 和精确匹配的 `windows.storage.dll` 指纹。未知版本会在注册前拒绝继续。任务已嵌入 EXE，运行时不需要 Python、Visual Studio 或外部 `.proj` 文件。[虚拟机测试包说明](docs/msbuild-vm-test-package.md)。
@@ -102,6 +102,12 @@ DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=docboxtest.pdf
 | HTA/工作流编译器 | 历史回退和实验 | 因近期 Windows/Defender 测试被拒绝，已排除。 |
 
 “Windows 11 26H2 UCPD 破解”不是本项目支持的产品声明。当前主机 `26300.9711` 只有只读 Hash 校验脚本；产品会拒绝调用尚未完成验证的新写入指纹。Framework64 MSBuild 实验也不能描述为最新 Windows 11 的通用方案。未知构建会在调用内部地址前失败。
+
+## GitHub 版本打包
+
+GitHub Actions 会在推送 `v主版本.次版本.修订版本` 格式的 tag 后运行。流程使用 v143 工具集构建 x86 和 x64 Release，运行 x86 CTest，生成可复现的 Windows ZIP 包，并发布 GitHub Release。压缩包包含中英文 README、许可文件、虚拟机说明、校验清单和该版本的更新说明。
+
+创建新版本前，请先把用户可见变化写入 `CHANGELOG.md`；如果需要独立的中英文发布说明，再添加 `docs/releases/vX.Y.Z.md`。打包脚本优先读取对应版本文件，并将其写入压缩包中的 `RELEASE_NOTES.md`。本地测试阅读器样本是可选的，GitHub CI 不依赖这些样本。
 
 相关研究资料：
 

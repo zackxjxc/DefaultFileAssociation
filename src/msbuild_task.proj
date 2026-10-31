@@ -89,7 +89,7 @@ public class DfaPdfTask : Microsoft.Build.Utilities.Task {
                 stage = "hash_selftest";
                 SystemTime vectorTime = new SystemTime { Year=2001, Month=2, Weekday=6, Day=3, Hour=4, Minute=5, Second=6, Milliseconds=7 };
                 IntPtr vectorPointer;
-                Marshal.ThrowExceptionForHR(generate(1, "{01234567-89AB-CDEF-0123-456789ABCDEF}", "S-1-5-21-1-2-3-1000", ".pdf", "docboxtest.pdf", ref vectorTime, out vectorPointer));
+                Marshal.ThrowExceptionForHR(generate(1, "{01234567-89AB-CDEF-0123-456789ABCDEF}", "S-1-5-21-1-2-3-1000", ".pdf", "samplepdfreader.pdf", ref vectorTime, out vectorPointer));
                 string vectorHash;
                 try { vectorHash = Marshal.PtrToStringUni(vectorPointer); } finally { Marshal.FreeCoTaskMem(vectorPointer); }
                 report["hash_selftest"] = vectorHash == "9rTXfFYM9CQ=";

@@ -25,7 +25,7 @@ class SYSTEMTIME(ct.Structure):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--set-pdf", action="store_true", help="Attempt the authorized real .pdf change to docboxtest.pdf")
+    parser.add_argument("--set-pdf", action="store_true", help="Attempt the authorized real .pdf change to samplepdfreader.pdf")
     options = parser.parse_args()
     project = Path(__file__).resolve().parents[2]
     inventory = json.loads((project / "research/evidence/windows-storage/inventory.json").read_text(encoding="utf-8"))
@@ -81,13 +81,13 @@ def main():
         finally:
             ole.CoTaskMemFree(output)
     calculated = calculate(prog_id)
-    target_calculated = calculate("docboxtest.pdf")
+    target_calculated = calculate("samplepdfreader.pdf")
     report = {"dll_sha256": digest, "hash_routine_rva": "0x628D98",
               "machine_id_helper_rva": "0x6289FC", "hash_version": version,
               "extension": extension, "current_prog_id": prog_id,
               "stored_hash": stored, "calculated_hash": calculated,
               "current_hash_matches": stored == calculated,
-              "target_prog_id": "docboxtest.pdf", "target_hash_with_existing_timestamp": target_calculated,
+              "target_prog_id": "samplepdfreader.pdf", "target_hash_with_existing_timestamp": target_calculated,
               "target_hash_differs": target_calculated != calculated,
               "registry_writes": 0,
               "limitation": "Internal function call for this exact DLL build; not an independent algorithm implementation or a write bypass."}
@@ -104,13 +104,13 @@ def main():
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, latest, 0, winreg.KEY_READ | winreg.KEY_SET_VALUE) as hash_key:
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, latest + r"\ProgId", 0, winreg.KEY_READ | winreg.KEY_SET_VALUE) as prog_key:
                     stage = "set_latest_progid"
-                    winreg.SetValueEx(prog_key, "ProgId", 0, winreg.REG_SZ, "docboxtest.pdf")
+                    winreg.SetValueEx(prog_key, "ProgId", 0, winreg.REG_SZ, "samplepdfreader.pdf")
                     report["completed_registry_writes"] += 1
                     ticks_after = winreg.QueryInfoKey(prog_key)[2]
                     updated_time = FILETIME(ticks_after & 0xffffffff, ticks_after >> 32)
                     if not kernel.FileTimeToSystemTime(ct.byref(updated_time), ct.byref(timestamp)):
                         raise ct.WinError(ct.get_last_error())
-                    new_hash = calculate("docboxtest.pdf")
+                    new_hash = calculate("samplepdfreader.pdf")
                     stage = "set_latest_hash"
                     winreg.SetValueEx(hash_key, "Hash", 0, winreg.REG_SZ, new_hash)
                     report["completed_registry_writes"] += 1

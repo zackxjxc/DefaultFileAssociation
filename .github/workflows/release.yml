@@ -1,0 +1,79 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Configure x86 tests
+        shell: pwsh
+        run: >-
+          cmake -S . -B out/ci-x86
+          -G "Visual Studio 17 2022" -A Win32 -T v143
+          -DBUILD_TESTING=ON -DDFA_FETCH_DEPENDENCIES=ON
+
+      - name: Build x86 tests and release binary
+        shell: pwsh
+        run: cmake --build out/ci-x86 --config Release --parallel 2
+
+      - name: Run x86 tests
+        shell: pwsh
+        run: ctest --test-dir out/ci-x86 -C Release --output-on-failure
+
+      - name: Configure x64 release
+        shell: pwsh
+        run: >-
+          cmake -S . -B out/ci-x64
+          -G "Visual Studio 17 2022" -A x64 -T v143
+          -DBUILD_TESTING=OFF -DDFA_FETCH_DEPENDENCIES=ON
+
+      - name: Build x64 release binary
+        shell: pwsh
+        run: cmake --build out/ci-x64 --config Release --parallel 2
+
+      - name: Package release archive
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: >-
+          python research/scripts/package_release.py
+          --version "$env:RELEASE_VERSION"
+          --x86 out/ci-x86/Release/DefaultFileAssociation.exe
+          --x64 out/ci-x64/Release/DefaultFileAssociation.exe
+          --output-dir out/packages
+          --release-notes-output out/packages/release-notes.md
+
+      - name: Upload release archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DefaultFileAssociation-${{ github.ref_name }}
+          path: out/packages/DefaultFileAssociation-${{ github.ref_name }}-windows.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: >-
+          gh release create "$env:RELEASE_VERSION"
+          out/packages/DefaultFileAssociation-${env:RELEASE_VERSION}-windows.zip
+          --repo "$env:GITHUB_REPOSITORY"
+          --title "$env:RELEASE_VERSION"
+          --notes-file out/packages/release-notes.md

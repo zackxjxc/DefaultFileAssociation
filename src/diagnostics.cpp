@@ -204,8 +204,8 @@ std::wstring Snapshot(const association::Specification& specification, bool quer
     for (const auto& path : {L"Software\\Classes\\" + specification.prog_id,
                              L"Software\\Classes\\" + specification.prog_id + L"\\DefaultIcon",
                              L"Software\\Classes\\" + specification.prog_id + L"\\shell\\open\\command"}) {
-        // prog_id=DocBox.pdf 时依次记录 HKCU\Software\Classes\DocBox.pdf、
-        // HKCU\Software\Classes\DocBox.pdf\DefaultIcon 和 \shell\open\command。
+        // prog_id=SamplePdfReader.pdf 时依次记录 HKCU\Software\Classes\SamplePdfReader.pdf、
+        // HKCU\Software\Classes\SamplePdfReader.pdf\DefaultIcon 和 \shell\open\command。
         DumpKey(output, HKEY_CURRENT_USER, path, L"HKCU");
     }
     DumpKey(output, HKEY_CURRENT_USER,

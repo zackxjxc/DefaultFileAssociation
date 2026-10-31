@@ -6,7 +6,7 @@
 
 - 从用户提供的三个 git-format patch 恢复项目，恢复文件与补丁中的 Git 对象指纹核对；当前目录原本没有 Git 仓库，本次归档初始化本地仓库，不推送。
 - 本机 Windows 显示版本 26H2，构建 26300.9550；UCPD 运行，研究未关闭其保护，也未更改 Defender 防护设置。
-- 目标为 `.pdf`、ProgID `docboxtest.pdf`、本地测试阅读器 `test_case/DocBox.exe`。阅读器和 PDF 样本是用户本地文件，不随源码提交。
+- 目标为 `.pdf`、ProgID `samplepdfreader.pdf`、本地测试阅读器 `test_case/SamplePdfReader.exe`。阅读器和 PDF 样本是用户本地文件，不随源码提交。
 - CMake 4.3.2、Visual Studio 2026、v143 工具集；x86 为原项目发布目标，x64 用于新格式原生对照实验。
 - 已使用本机 IDA Pro 9.0、Hex-Rays、idalib 和 Windows CDB。未安装 REA；后续不需要在虚拟机安装 AI 才能采集证据。
 - 用户要求只在后台工作；Defender 告警后停止物理机上的新宿主执行测试。虚拟机内存采集和内核调试仍未执行。
@@ -18,8 +18,8 @@
 | 原项目旧 UserChoice 路线 | 本机 PDF 设置被拒绝，错误 5 | 普通 `--check` 不验证新格式，不能作为 UserChoiceLatest 成功依据 |
 | Python 新格式直接写入 | 系统调用返回 `STATUS_ACCESS_DENIED`，零次目标写入 | 已确认系统调用失败，未通过内核断点证明具体拒绝者和分支 |
 | 自有 x64 EXE 新格式直接写入 | 只读 Hash/Shell 校验通过；实际写 ProgId 错误 5、零次写入 | 原生计算逻辑与对照一致，但没有获得独立设置能力 |
-| Visual Studio MSBuild | 从 Edge 切换到 DocBox；Hash、Shell、实际 PDF 打开验证成功 | 单机结果，依赖精确系统 DLL 内部函数，不是稳定公开接口 |
-| 系统 Framework64 MSBuild | 两次真实设置调用成功，独立原生校验通过 | 测试前已是 DocBox；尚未证明干净 VM 上完整首次切换 |
+| Visual Studio MSBuild | 从 Edge 切换到 SamplePdfReader；Hash、Shell、实际 PDF 打开验证成功 | 单机结果，依赖精确系统 DLL 内部函数，不是稳定公开接口 |
+| 系统 Framework64 MSBuild | 两次真实设置调用成功，独立原生校验通过 | 测试前已是 SamplePdfReader；尚未证明干净 VM 上完整首次切换 |
 | InstallUtil、Regsvr32、ODBCConf | 各完成两次设置调用，独立 Hash/Shell 校验通过 | 测试前已是目标；近期查询未发现对应 Defender 告警，不代表跨环境不会告警 |
 | RegAsm | 回调前权限检查退出 100 | 没有执行目标写入，不计为成功路线 |
 | Microsoft.Workflow.Compiler | 写入和关联校验通过，但触发 Defender 行为检测 | 排除；退出码与关联有效不足以判定可用 |

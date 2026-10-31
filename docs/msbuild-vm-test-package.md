@@ -1,6 +1,6 @@
 # Framework MSBuild 虚拟机测试包
 
-目标：将包内 DocBox.exe 设置为当前用户 PDF 默认阅读器，ProgID 为 docboxtest.pdf，图标序号为 **1**。普通用户执行，不以管理员身份运行。
+目标：将包内 SamplePdfReader.exe 设置为当前用户 PDF 默认阅读器，ProgID 为 samplepdfreader.pdf，图标序号为 **1**。普通用户执行，不以管理员身份运行。
 
 DefaultFileAssociation.exe 是 x86 入口，64 位 Windows 上自动使用系统 Framework64 MSBuild。DefaultFileAssociation-x64.exe 是相同实现的 x64 构建。任务内容已经嵌入 EXE，不需要 Python、Visual Studio、IDA、Codex 或外部 .proj 文件。系统需要现有 Framework64 MSBuild 与 .NET Framework 构建组件。
 
@@ -33,16 +33,16 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-msbuild-package.p
 也可以直接调用 EXE：
 
 ```powershell
-.\DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=docboxtest.pdf --exe-path="C:\DFA Test\DocBox.exe" --icon-index=1 --log-file="C:\DFA Test\set.log"
+.\DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\DFA Test\SamplePdfReader.exe" --icon-index=1 --log-file="C:\DFA Test\set.log"
 ```
 
-阅读器路径应替换为实际解压位置。脚本自动使用相邻 DocBox.exe 的绝对路径，支持空格和中文目录，不依赖本机 E: 盘路径。
+阅读器路径应替换为实际解压位置。脚本自动使用相邻 SamplePdfReader.exe 的绝对路径，支持空格和中文目录，不依赖本机 E: 盘路径。
 
 ## 完整测试清单
 
 1. 记录 VM 的 Windows 完整构建/补丁与初始 PDF 默认程序，分别测试首次设置、从其他阅读器切换、已是目标时再次设置。
 2. 设置后运行 Check；确认 DefaultIcon 与 ApplicationIcon 都是阅读器路径加 `,1`。
-3. 手动双击 012.pdf，确认实际由 DocBox 打开，无首次打开选择提示。可在 Set/Check 后加 `-OpenPdf` 做真实打开测试。
+3. 手动双击 012.pdf，确认实际由 SamplePdfReader 打开，无首次打开选择提示。可在 Set/Check 后加 `-OpenPdf` 做真实打开测试。
 4. 注销/重新登录、重启后再次运行 Check 并双击 PDF。不要在这期间移动解压目录；移动后存储的阅读器绝对路径将失效。
 5. 查看 Windows 安全中心保护历史。即使关联成功，出现拦截也要报告，不能把退出码 0 当作可部署结论。
 

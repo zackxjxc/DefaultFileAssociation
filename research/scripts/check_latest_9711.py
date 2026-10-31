@@ -49,7 +49,7 @@ def main():
                 ole.CoTaskMemFree(output)
 
         vector = calculate("{01234567-89AB-CDEF-0123-456789ABCDEF}",
-                           "S-1-5-21-1-2-3-1000", "docboxtest.pdf",
+                           "S-1-5-21-1-2-3-1000", "samplepdfreader.pdf",
                            SYSTEMTIME(2001, 2, 6, 3, 4, 5, 6, 7))
         if vector != "9rTXfFYM9CQ=":
             raise RuntimeError("Fixed hash vector did not match")

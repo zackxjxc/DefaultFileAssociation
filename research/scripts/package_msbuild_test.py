@@ -12,8 +12,8 @@ output = root / "out" / "packages" / ("DefaultFileAssociation-MSBuild-" + stamp 
 sources = {
     "DefaultFileAssociation.exe": root / "out/build/windows-x86-v143/Release/DefaultFileAssociation.exe",
     "DefaultFileAssociation-x64.exe": root / "out/build/windows-x64-v143/Release/DefaultFileAssociation.exe",
-    "DocBox.exe": root / "test_case/DocBox.exe",
-    "libdocbox.dll": root / "test_case/libdocbox.dll",
+    "SamplePdfReader.exe": root / "test_case/SamplePdfReader.exe",
+    "libsamplepdfreader.dll": root / "test_case/libsamplepdfreader.dll",
     "012.pdf": root / "test_case/012.pdf",
     "test-msbuild-package.ps1": root / "test_case/test-msbuild-package.ps1",
     "test-msbuild-menu.bat": root / "test_case/test-msbuild-menu.bat",
@@ -22,7 +22,7 @@ sources = {
 payloads = {name: path.read_bytes() for name, path in sources.items()}
 commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
 manifest = {
-    "commit": commit, "prog_id": "docboxtest.pdf", "icon_index": 1,
+    "commit": commit, "prog_id": "samplepdfreader.pdf", "icon_index": 1,
     "backend": "Windows Framework64 MSBuild; task embedded in EXE",
     "files": {name: {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
               for name, data in payloads.items()},

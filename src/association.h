@@ -10,7 +10,7 @@
 namespace dfa::association {
 
 struct Specification {
-    // 示例：extension=.pdf、executable=C:\Apps\DocBox\DocBox.exe、prog_id=DocBox.pdf。
+    // 示例：extension=.pdf、executable=C:\Apps\SamplePdfReader\SamplePdfReader.exe、prog_id=SamplePdfReader.pdf。
     // executable/icon_path 是磁盘路径；extension/prog_id 是注册表键名称的一部分。
     // 为兼容原接口保留 extension 字段名；协议模式中其值为 http/https，不带点。
     std::wstring extension;

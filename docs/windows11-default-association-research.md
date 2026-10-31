@@ -124,7 +124,7 @@ whoami /user
 
 ## 2026-10-13：本机自动逆向研究结果
 
-本节补充实际二进制分析和运行时实验。本机已验证一种普通用户权限下设置 `docboxtest.pdf` 的实验方案：使用现有的微软签名 amd64 MSBuild 进程执行新格式写入，调用精确匹配本机构建的系统 DLL 生成哈希。新哈希、Shell 有效关联和真实 PDF 打开均已验证成功。该结果尚不代表跨版本通用支持。
+本节补充实际二进制分析和运行时实验。本机已验证一种普通用户权限下设置 `samplepdfreader.pdf` 的实验方案：使用现有的微软签名 amd64 MSBuild 进程执行新格式写入，调用精确匹配本机构建的系统 DLL 生成哈希。新哈希、Shell 有效关联和真实 PDF 打开均已验证成功。该结果尚不代表跨版本通用支持。
 
 ### 环境与分析方式
 
@@ -154,17 +154,17 @@ whoami /user
 
 `research/scripts/hash_probe.py` 在独立的普通用户进程内调用本机新哈希入口，并先检查系统 DLL 的 SHA-256 必须等于分析副本。只读模式成功重算出 `nwTrccHD32s=`，与当前实际保存的 PDF 哈希完全相同。
 
-同样输入时间下，换成 `docboxtest.pdf` 会得到另一个哈希；它只是输入变化对照，不是已经提交或已经生效的默认关联。该验证仅覆盖本机当前 PDF 样本，尚未独立重实现算法，也不能视为跨版本支持。
+同样输入时间下，换成 `samplepdfreader.pdf` 会得到另一个哈希；它只是输入变化对照，不是已经提交或已经生效的默认关联。该验证仅覆盖本机当前 PDF 样本，尚未独立重实现算法，也不能视为跨版本支持。
 
 ### Python 进程直接写新结构被拒绝
 
-使用该脚本的显式 `--set-pdf` 模式，尝试把已注册的 `docboxtest.pdf` 写入新结构。没有删除或改 ACL，也没有关闭 UCPD 或修改系统保护功能。
+使用该脚本的显式 `--set-pdf` 模式，尝试把已注册的 `samplepdfreader.pdf` 写入新结构。没有删除或改 ACL，也没有关闭 UCPD 或修改系统保护功能。
 
 实验结果：
 
 1. 可以用 `KEY_READ | KEY_SET_VALUE` 打开新结构及其 ProgId 子键。
-2. `RegSetValueExW` 写 `ProgId=docboxtest.pdf` 返回 Win32 错误 5。
-3. 在 CDB 中命中真实的 `ntdll!NtSetValueKey`，确认值名为 `ProgId`、待写数据为 `docboxtest.pdf`、键路径为 `.pdf\UserChoiceLatest\ProgId`。
+2. `RegSetValueExW` 写 `ProgId=samplepdfreader.pdf` 返回 Win32 错误 5。
+3. 在 CDB 中命中真实的 `ntdll!NtSetValueKey`，确认值名为 `ProgId`、待写数据为 `samplepdfreader.pdf`、键路径为 `.pdf\UserChoiceLatest\ProgId`。
 4. 键句柄的 GrantedAccess 为 `0x2001B`，包含 SetValue；系统调用返回后 `EAX=0xC0000022`，即 STATUS_ACCESS_DENIED。
 5. 此轮新结构实验完成的注册表写入为 0；原新结构的 ProgID、Hash 和 ProgId 子键时间均未变化。
 6. Shell 复查仍返回 `MSEdgePDF`，打开命令仍指向 Edge。
@@ -199,14 +199,14 @@ CDB 使用本地符号路径及 `-cf` 读取命令文件；不要用 `$$><` 把�
 
 验证现有 `C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe` 的 Authenticode 签名有效，签名主体为 `.NET / Microsoft Corporation`。通过 CodeTaskFactory 在该进程中执行项目内的 C# 测试任务，不启动提升进程、不修改签名程序文件、不更改 UCPD 状态。
 
-任务首先验证未提升权限、64 位进程、系统 DLL SHA-256 精确匹配、HashVersion 为 1，并成功重算现有哈希。随后写入 `UserChoiceLatest\ProgId\ProgId=docboxtest.pdf`，读取该子键的新时间戳，生成新哈希，写入 `UserChoiceLatest\Hash`，通知 Shell。
+任务首先验证未提升权限、64 位进程、系统 DLL SHA-256 精确匹配、HashVersion 为 1，并成功重算现有哈希。随后写入 `UserChoiceLatest\ProgId\ProgId=samplepdfreader.pdf`，读取该子键的新时间戳，生成新哈希，写入 `UserChoiceLatest\Hash`，通知 Shell。
 
 结果：
 
 - 完成 2 次目标注册表写入，任务返回 0。
 - 独立 Python 只读复查成功重算新哈希。
-- Shell 返回有效 ProgID `docboxtest.pdf`，打开命令为 `"E:\Work\DefaultFileAssociation\test_case\DocBox.exe" "%1" %*`。
-- 通过系统 Shell 打开 `test_case/012.pdf`，实际启动 `test_case/DocBox.exe`；进程命令行包含测试 PDF 路径，窗口显示该 PDF 第 1 页、共 10 页。
+- Shell 返回有效 ProgID `samplepdfreader.pdf`，打开命令为 `"E:\Work\DefaultFileAssociation\test_case\SamplePdfReader.exe" "%1" %*`。
+- 通过系统 Shell 打开 `test_case/012.pdf`，实际启动 `test_case/SamplePdfReader.exe`；进程命令行包含测试 PDF 路径，窗口显示该 PDF 第 1 页、共 10 页。
 - 封装脚本再次执行设置并验证成功，产生独立运行报告。
 
 这个成败对照说明写入来源会影响结果，但没有通过内核断点证明 MSBuild 被允许的具体原因；不能仅凭签名有效就宣称所有微软签名程序都会通过。
@@ -226,20 +226,20 @@ CDB 使用本地符号路径及 `-cf` 读取命令文件；不要用 `$$><` 把�
 复现原生写入：
 
 ```powershell
-& .\out\build\windows-x64-v143\Release\DefaultFileAssociation.exe --latest-native-probe --ext=.pdf --prog-id=docboxtest.pdf --log-file native-probe.log
+& .\out\build\windows-x64-v143\Release\DefaultFileAssociation.exe --latest-native-probe --ext=.pdf --prog-id=samplepdfreader.pdf --log-file native-probe.log
 ```
 
 加 `--check` 可只读复查。这个入口只复用已注册处理器，不接受 `--exe-path`，也不走普通设置路径。
 
 本轮开始时，注册表中的 Hash 与 ProgId 子键时间不匹配。Python、MSBuild 和原生 EXE 三者计算出了相同的预期 Hash，排除了原生移植计算差异。首次原生实际写入返回错误 5，零次写入，前后值与时间均未变化。
 
-随后单独运行 MSBuild 对照任务，使用显式 `/p:PermitHashRepair=true` 修复已有 `docboxtest.pdf` 的无效 Hash。该参数默认关闭，只有同时显式设置且原 ProgID 已经是目标时才允许修复；普通任务行为保留原校验要求。MSBuild 对照成功完成两次设置调用。该操作不是原生 EXE 的一部分。
+随后单独运行 MSBuild 对照任务，使用显式 `/p:PermitHashRepair=true` 修复已有 `samplepdfreader.pdf` 的无效 Hash。该参数默认关闭，只有同时显式设置且原 ProgID 已经是目标时才允许修复；普通任务行为保留原校验要求。MSBuild 对照成功完成两次设置调用。该操作不是原生 EXE 的一部分。
 
 在有效记录上重测：
 
 | 操作 | 结果 |
 | --- | --- |
-| 原生 EXE 只读重算 Hash 和 Shell 查询 | 返回 0，Hash 匹配，Shell 为 `docboxtest.pdf`，命令指向 DocBox |
+| 原生 EXE 只读重算 Hash 和 Shell 查询 | 返回 0，Hash 匹配，Shell 为 `samplepdfreader.pdf`，命令指向 SamplePdfReader |
 | 原生 EXE 实际 `RegSetValueExW` 写 ProgId | 返回错误 5 / HRESULT `0x80070005`，EXE 退出 5 |
 | 实际完成的原生注册表写入 | 0；值和子键时间均未变化 |
 | 原生 EXE 写后只读复查 | 返回 0，Hash 和 Shell 仍有效 |
@@ -289,8 +289,8 @@ PDF 对应规则类别 1。默认配置在 RVA `0x116C4` 分配并清零；初�
 
 测试顺序为 Framework 宿主只读重算 Hash、实际执行设置模式、封装脚本只读复查、独立原生 EXE 再次验证。结果：
 
-- 设置模式完成 2 次注册表设置调用，MSBuild 退出 0。当前原本已经是 `docboxtest.pdf`，任务仍实际执行写入，没有以“已是默认”为由跳过；前后值与时间未变化。
-- 有效 Hash、Shell ProgID 和打开命令均正确；Shell 命令指向 `test_case/DocBox.exe`。
+- 设置模式完成 2 次注册表设置调用，MSBuild 退出 0。当前原本已经是 `samplepdfreader.pdf`，任务仍实际执行写入，没有以“已是默认”为由跳过；前后值与时间未变化。
+- 有效 Hash、Shell ProgID 和打开命令均正确；Shell 命令指向 `test_case/SamplePdfReader.exe`。
 - 宿主和任务加载的 Microsoft.Build 组件均来自 Windows 的 .NET Framework 目录/GAC，未依赖 Visual Studio 构建组件。
 - UCPD 仍在运行；没有修改保护配置，没有使用 computer use，没有打开 PDF 或其他窗口。
 
@@ -310,7 +310,7 @@ PDF 对应规则类别 1。默认配置在 RVA `0x116C4` 分配并清零；初�
 
 ### 其他宿主实验与 Defender 告警
 
-后台筛查了本机 12 个候选路径。InstallUtil、Regsvr32、ODBCConf 的回调均成功完成固定 `docboxtest.pdf` 的两次设置调用，随后独立原生检查 Hash 与 Shell 返回 0。当前记录原本即为目标，任务没有跳过真实写入；没有安装服务、注册实际 COM 组件或创建 ODBC 数据源。RegAsm 在回调前因权限要求退出 100，没有执行目标写入。结果与完整逐项日志在 `research/evidence/alternate-host-results.json`、`research/evidence/host-probes`。
+后台筛查了本机 12 个候选路径。InstallUtil、Regsvr32、ODBCConf 的回调均成功完成固定 `samplepdfreader.pdf` 的两次设置调用，随后独立原生检查 Hash 与 Shell 返回 0。当前记录原本即为目标，任务没有跳过真实写入；没有安装服务、注册实际 COM 组件或创建 ODBC 数据源。RegAsm 在回调前因权限要求退出 100，没有执行目标写入。结果与完整逐项日志在 `research/evidence/alternate-host-results.json`、`research/evidence/host-probes`。
 
 另测试了 Microsoft.Workflow.Compiler 的普通工作流编译/验证回调。虽然测试进程退出 0、回调报告成功且关联验证通过，但随后 Defender 行为监控命中，因此不能将它计为可用方案，也不能仅以退出码或关联生效判断宿主方案可部署。
 

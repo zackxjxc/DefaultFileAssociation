@@ -37,9 +37,9 @@ MSBuild、msiexec、InstallUtil、Regsvr32、ODBCConf 均不在这 14 项中。�
 
 ## MakeDefault 的实测结果
 
-通过公共 SHAssocEnumHandlers 枚举 .pdf 的处理器，DocBox、Edge、Chrome 等枚举对象的 IAssocHandler vtable 第 7 槽，即 MakeDefault，均指向本机 windows.storage.dll RVA 0x2974B0。对应机器码是 `xor eax,eax; ret`，直接返回 S_OK。
+通过公共 SHAssocEnumHandlers 枚举 .pdf 的处理器，SamplePdfReader、Edge、Chrome 等枚举对象的 IAssocHandler vtable 第 7 槽，即 MakeDefault，均指向本机 windows.storage.dll RVA 0x2974B0。对应机器码是 `xor eax,eax; ret`，直接返回 S_OK。
 
-自有 x64 EXE 实际调用 DocBox 处理器的 MakeDefault 返回 S_OK；旧 UserChoice、新 UserChoiceLatest 与 ProgId 子键的全部值和最后写入时间均未改变，独立 Hash/Shell 检查仍为原来的 docboxtest.pdf。调用前已经是该目标；结合空实现可确认此枚举对象没有执行设置，不能仅凭 S_OK 宣称切换成功。
+自有 x64 EXE 实际调用 SamplePdfReader 处理器的 MakeDefault 返回 S_OK；旧 UserChoice、新 UserChoiceLatest 与 ProgId 子键的全部值和最后写入时间均未改变，独立 Hash/Shell 检查仍为原来的 samplepdfreader.pdf。调用前已经是该目标；结合空实现可确认此枚举对象没有执行设置，不能仅凭 S_OK 宣称切换成功。
 
 这只排除当前枚举实现上的此入口，不推断所有 Windows 版本或私有接口都无效。系统 OpenWith 界面的内部 MakeDefault 工作函数是另一条调用链。
 
@@ -58,11 +58,11 @@ MSBuild、msiexec、InstallUtil、Regsvr32、ODBCConf 均不在这 14 项中。�
 | regsvr32.exe | 通过 | 通过 | 2 | 通过 |
 | odbcconf.exe | 通过 | 通过 | 2 | 通过 |
 
-每个写入阶段之前，使用已验证 MSBuild 把默认 ProgID 切换到唯一的临时控制 ProgID，仍指向同一 DocBox。之后由候选宿主写回 docboxtest.pdf；回调记录实际宿主 EXE、完成两次写入，外部 EXE 独立验证 Hash、有效 ProgID 与打开命令。MSBuild 只用于建立对照和恢复，候选的目标写入不经 MSBuild。
+每个写入阶段之前，使用已验证 MSBuild 把默认 ProgID 切换到唯一的临时控制 ProgID，仍指向同一 SamplePdfReader。之后由候选宿主写回 samplepdfreader.pdf；回调记录实际宿主 EXE、完成两次写入，外部 EXE 独立验证 Hash、有效 ProgID 与打开命令。MSBuild 只用于建立对照和恢复，候选的目标写入不经 MSBuild。
 
 因此本次加强了“确实能从其他 ProgID 切换”的证据，但没有测试不同阅读器 EXE、首次用户、重启持久性或每个宿主下的真实 PDF 打开。四次切换均保留同一阅读器路径，不把它描述为四次不同阅读器的完整首次设置。
 
-正常权限下执行，Defender 与 UCPD 保持启用。测试时段的 Defender 1116/1117 查询成功，未发现新增检测事件；这是该时段观察，不承诺其他系统或未来规则不告警。结束时 docboxtest.pdf 的 Hash/Shell 验证通过，唯一临时注册项已清理，原有阅读器注册未改写。
+正常权限下执行，Defender 与 UCPD 保持启用。测试时段的 Defender 1116/1117 查询成功，未发现新增检测事件；这是该时段观察，不承诺其他系统或未来规则不告警。结束时 samplepdfreader.pdf 的 Hash/Shell 验证通过，唯一临时注册项已清理，原有阅读器注册未改写。
 
 复现脚本 `research/scripts/run_host_switch_tests.py` 需显式 --only 选择宿主，顺序执行、只读阶段失败跳过写入、发现防护事件停止并恢复。HTA/工作流编译器仍按先前结论排除。
 
@@ -85,15 +85,15 @@ MSBuild 当前执行路径是 C# 源码到 .NET 程序集，再由 CLR 加载和
 ```json
 {
   "extension": ".pdf",
-  "progId": "docboxtest.pdf",
-  "readerPath": "C:\\DFA Test\\DocBox.exe",
+  "progId": "samplepdfreader.pdf",
+  "readerPath": "C:\\DFA Test\\SamplePdfReader.exe",
   "iconIndex": 1
 }
 ```
 
 拟议流程为：我们的 EXE 根据用户选择生成独立临时 JSON，通过子进程环境变量传递配置文件路径；宿主加载 DLL并调用约定入口；DLL读取并校验配置，执行设置并输出报告；我们的 EXE 独立检查有效关联后清理临时文件。环境变量适合 DllRegisterServer 这种没有自定义参数的入口，避免把配置直接拼入宿主命令行。
 
-当前 MSBuild 已动态接收 ProgID、操作模式和报告路径。其他宿主的研究 DLL 仍固定使用 docboxtest.pdf，尚未实现 JSON 参数化；本节只记录设计结论，没有修改实现。系统 DLL 指纹、内部函数地址和 HashVersion 支持范围仍由版本适配代码管理，增加配置文件不自动扩大 Windows 兼容范围。
+当前 MSBuild 已动态接收 ProgID、操作模式和报告路径。其他宿主的研究 DLL 仍固定使用 samplepdfreader.pdf，尚未实现 JSON 参数化；本节只记录设计结论，没有修改实现。系统 DLL 指纹、内部函数地址和 HashVersion 支持范围仍由版本适配代码管理，增加配置文件不自动扩大 Windows 兼容范围。
 
 代码需要在宿主进程内实际执行。仅让 MSBuild 或另一个宿主启动我们的普通 EXE，写入进程身份仍是该 EXE，不能把父进程身份当作可继承的放行授权。
 

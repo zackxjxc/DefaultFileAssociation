@@ -129,7 +129,7 @@ constexpr std::wstring_view kThreshold2Guid = L"{d18b6dd5-6124-4341-9318-804003b
     }
 
     std::wstring input = extension + user_sid + prog_id;
-    // 无分隔符拼接，旧版示例：.pdfs-1-5-21-123-456-789-1001docbox.pdf。
+    // 无分隔符拼接，旧版示例：.pdfs-1-5-21-123-456-789-1001samplepdfreader.pdf。
     // Win10+ 再追加十六位 FILETIME 十六进制文本、固定体验说明和对应 GUID，整体转小写。
     if (version == HashVersion::Windows10Threshold1 ||
         version == HashVersion::Windows10Threshold2OrLater) {

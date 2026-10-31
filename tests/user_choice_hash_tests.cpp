@@ -41,15 +41,15 @@ void TestUserChoiceHash() {
     timestamp.wMilliseconds = 789;
 
     const std::wstring extension = L".PDF";
-    const std::wstring prog_id = L"DocBox.PDF";
+    const std::wstring prog_id = L"SamplePdfReader.PDF";
     const std::wstring sid = L"S-1-5-21-123-456-789-1001";
 
     const dfa::platform::WindowsVersion windows7{6, 1, 7601};
     const auto legacy = dfa::crypto::GenerateUserChoiceHash(
         extension, prog_id, sid, timestamp, windows7);
     Require(legacy.ok, "legacy hash status");
-    Require(legacy.value == L"Z0g2+p/Tgc4=", "legacy hash vector");
-    Require(legacy.input == L".pdfs-1-5-21-123-456-789-1001docbox.pdf", "legacy input");
+    Require(legacy.value == L"oMWz0vnsGGs=", "legacy hash vector");
+    Require(legacy.input == L".pdfs-1-5-21-123-456-789-1001samplepdfreader.pdf", "legacy input");
     const auto windows8 = dfa::crypto::GenerateUserChoiceHash(
         extension, prog_id, sid, timestamp, dfa::platform::WindowsVersion{6, 2, 9200});
     Require(windows8.ok && windows8.value == legacy.value, "Windows 8 legacy hash");
@@ -64,9 +64,9 @@ void TestUserChoiceHash() {
     const auto threshold1 = dfa::crypto::GenerateUserChoiceHash(
         extension, prog_id, sid, timestamp, windows10_1507);
     Require(threshold1.ok, "Windows 10 Threshold 1 hash status");
-    Require(threshold1.value == L"9u3wpykAlW4=", "Windows 10 Threshold 1 hash vector");
+    Require(threshold1.value == L"AYGV9SxOjdk=", "Windows 10 Threshold 1 hash vector");
     Require(threshold1.input ==
-                L".pdfs-1-5-21-123-456-789-1001docbox.pdf01da3d28554dd000"
+                L".pdfs-1-5-21-123-456-789-1001samplepdfreader.pdf01da3d28554dd000"
                 L"user choice set via windows user experience "
                 L"{480368b3-f2e4-45ae-ba6d-852c4f639a40}",
             "Windows 10 Threshold 1 input");
@@ -75,7 +75,7 @@ void TestUserChoiceHash() {
     const auto threshold2 = dfa::crypto::GenerateUserChoiceHash(
         extension, prog_id, sid, timestamp, windows11);
     Require(threshold2.ok, "Windows 10 Threshold 2 hash status");
-    Require(threshold2.value == L"llYvrEJqBhc=", "Windows 10 Threshold 2 hash vector");
+    Require(threshold2.value == L"/DwAmVptZUY=", "Windows 10 Threshold 2 hash vector");
     Require(threshold2.input.ends_with(
                 L"{d18b6dd5-6124-4341-9318-804003bafa0b}"),
             "Windows 10 Threshold 2 input");

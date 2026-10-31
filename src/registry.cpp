@@ -25,8 +25,8 @@ Result<void> Checked(LSTATUS status, std::wstring_view operation) {
 
 Result<wil::unique_hkey> Open(HKEY root, std::wstring_view key, REGSAM access,
                                bool create = false) {
-    // root 与 key 分开传递；如 root=HKCU、key=Software\Classes\DocBox.pdf，
-    // 实际位置是 HKCU\Software\Classes\DocBox.pdf。key 本身不能再包含“HKCU\”。
+    // root 与 key 分开传递；如 root=HKCU、key=Software\Classes\SamplePdfReader.pdf，
+    // 实际位置是 HKCU\Software\Classes\SamplePdfReader.pdf。key 本身不能再包含“HKCU\”。
     // WIL 的打开/创建帮助函数只提供固定权限选项，读写选项为 KEY_ALL_ACCESS。
     // 此处用原生 API 保留精确的 REGSAM 权限，键句柄仍由 WIL 自动释放。
     // Win7+ 的 HKCU\Software 和普通 Classes 文件关联键在 WOW64 下共享。
@@ -46,7 +46,7 @@ Result<wil::unique_hkey> Open(HKEY root, std::wstring_view key, REGSAM access,
 template <typename Iterator>
 Result<std::vector<std::wstring>> Names(HKEY root, std::wstring_view key) {
     // 枚举的是值名称或直接子键名称，既不读取值数据，也不递归遍历子树。
-    // 例如 .pdf\OpenWithProgids 中得到 DocBox.pdf；OpenWithList 中得到 docbox.exe。
+    // 例如 .pdf\OpenWithProgids 中得到 SamplePdfReader.pdf；OpenWithList 中得到 samplepdfreader.exe。
     auto handle = Open(root, key, KEY_READ);
     if (!handle) {
         return std::unexpected(handle.error());
@@ -87,8 +87,8 @@ Result<void> SetDword(HKEY root, std::wstring_view key,
 Result<void> SetString(HKEY root, std::wstring_view key,
                        std::wstring_view value_name, std::wstring_view value) {
     // 空 value_name 表示“默认值”。WIL 负责写入带终止符的 Unicode REG_SZ。
-    // 例如 key=Software\Classes\DocBox.pdf\shell\open\command、value_name=""，
-    // value 是 "C:\Apps\DocBox\DocBox.exe" "%1" %*，而不是要继续拼接的子键。
+    // 例如 key=Software\Classes\SamplePdfReader.pdf\shell\open\command、value_name=""，
+    // value 是 "C:\Apps\SamplePdfReader\SamplePdfReader.exe" "%1" %*，而不是要继续拼接的子键。
     auto handle = Open(root, key, KEY_SET_VALUE, true);
     if (!handle) {
         return std::unexpected(handle.error());

@@ -9,10 +9,10 @@ $tool = Join-Path $PSScriptRoot 'DefaultFileAssociation.exe'
 if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) {
     $tool = Join-Path (Split-Path -Parent $PSScriptRoot) 'out\build\windows-x86-v143\Release\DefaultFileAssociation.exe'
 }
-$reader = Join-Path $PSScriptRoot 'DocBox.exe'
+$reader = Join-Path $PSScriptRoot 'SamplePdfReader.exe'
 $pdf = Join-Path $PSScriptRoot '012.pdf'
 if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw 'DefaultFileAssociation.exe is missing.' }
-if ($Mode -eq 'Set' -and -not (Test-Path -LiteralPath $reader -PathType Leaf)) { throw 'DocBox.exe is missing.' }
+if ($Mode -eq 'Set' -and -not (Test-Path -LiteralPath $reader -PathType Leaf)) { throw 'SamplePdfReader.exe is missing.' }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 if ([Security.Principal.WindowsPrincipal]::new($identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run as a normal user, not as administrator.' }
 $runDirectory = Join-Path (Join-Path $PSScriptRoot 'results') ((Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N'))
@@ -26,7 +26,7 @@ function Read-Value {
 }
 function Snapshot {
     $latest = 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoiceLatest'
-    $classes = 'Software\Classes\docboxtest.pdf'
+    $classes = 'Software\Classes\samplepdfreader.pdf'
     return [ordered]@{
         LatestProgId = Read-Value ([Microsoft.Win32.Registry]::CurrentUser) ($latest + '\ProgId') 'ProgId'
         LatestHash = Read-Value ([Microsoft.Win32.Registry]::CurrentUser) $latest 'Hash'
@@ -37,7 +37,7 @@ function Snapshot {
 }
 $before = Snapshot
 $started = Get-Date
-$toolArguments = @('--msbuild','--ext=.pdf','--prog-id=docboxtest.pdf', ('--log-file=' + (Join-Path $runDirectory 'tool.log')))
+$toolArguments = @('--msbuild','--ext=.pdf','--prog-id=samplepdfreader.pdf', ('--log-file=' + (Join-Path $runDirectory 'tool.log')))
 if ($Mode -eq 'Preflight') { $toolArguments += '--preflight' }
 elseif ($Mode -eq 'Check') { $toolArguments += '--check' }
 else { $toolArguments += @(('--exe-path=' + $reader), '--icon-index=1') }
@@ -62,7 +62,7 @@ if ($Mode -ne 'Set') {
     foreach ($taskReport in $taskReports) { $success = $success -and $taskReport.completed_registry_writes -eq 0 }
 }
 if ($Mode -ne 'Preflight') {
-    $success = $success -and $after.LatestProgId -ieq 'docboxtest.pdf' -and
+    $success = $success -and $after.LatestProgId -ieq 'samplepdfreader.pdf' -and
         $after.RegisteredCommand -ieq $expectedCommand -and $after.DefaultIcon -ieq $expectedIcon -and
         $after.ApplicationIcon -ieq $expectedIcon -and $log -match '(?m)^shell_matches=true\r?$'
 }
@@ -73,7 +73,7 @@ try {
 } catch { $avReadError = $_.Exception.Message }
 $report = [ordered]@{
     Timestamp = [DateTimeOffset]::Now.ToString('o'); Mode=$Mode; ToolExitCode=$toolExit
-    Tool=$tool; Reader=$reader; ProgId='docboxtest.pdf'; IconIndex=1
+    Tool=$tool; Reader=$reader; ProgId='samplepdfreader.pdf'; IconIndex=1
     Before=$before; After=$after; TaskReports=$taskReports; AssociationSuccess=[bool]$success
     DefenderEvents=$avEvents; DefenderQueryError=$avReadError
     Note='AssociationSuccess reports association verification; review Defender events separately. Preflight success only confirms compatibility.'

@@ -26,7 +26,7 @@ extern "C" HRESULT WINAPI DllRegisterServer() {
         const std::filesystem::path log_path(report.data());
         if (!log_path.is_absolute() || log_path.parent_path().filename() != L"host-probes") return E_INVALIDARG;
         std::wstring trace;
-        const auto result = dfa::latest_native::Probe(L"docboxtest.pdf", operation == L"write", trace);
+        const auto result = dfa::latest_native::Probe(L"samplepdfreader.pdf", operation == L"write", trace);
         trace = L"host_executable=" + std::wstring(host.data()) + L"\n" + trace;
         trace += L"result_message=" + result.message + L"\n";
         const int size = ::WideCharToMultiByte(CP_UTF8, 0, trace.data(), static_cast<int>(trace.size()),

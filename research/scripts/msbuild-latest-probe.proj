@@ -1,6 +1,6 @@
 <!-- Authored by Codex. A build-specific, per-user PDF association experiment.
      Default: read-only hash validation. /p:AttemptSet=true explicitly attempts
-     the authorized docboxtest.pdf change. Does not change system protection. -->
+     the authorized samplepdfreader.pdf change. Does not change system protection. -->
 <Project DefaultTargets="Probe" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <AttemptSet Condition="'$(AttemptSet)' == ''">false</AttemptSet>
@@ -63,7 +63,7 @@ public class LatestAssociationProbe : Microsoft.Build.Utilities.Task
     public override bool Execute()
     {
         const string latest = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.pdf\UserChoiceLatest";
-        const string target = "docboxtest.pdf";
+        const string target = "samplepdfreader.pdf";
         var report = new Dictionary<string, object>();
         report["attempt_set"] = AttemptSet;
         report["permit_hash_repair"] = PermitHashRepair;

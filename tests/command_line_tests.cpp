@@ -36,10 +36,10 @@ void Run() {
     Require(::GetSystemDirectoryW(system_directory, MAX_PATH) != 0, "System directory");
     const std::wstring executable = L"--exe_path=" + std::wstring(system_directory) + L"\\cmd.exe";
     const auto aliases = Parse({L"dfa.exe", L"--ext=.PDF", executable,
-                                L"--icon_idx=0", L"--prog_name=DocBox.pdf", L"--dry-run"});
+                                L"--icon_idx=0", L"--prog_name=SamplePdfReader.pdf", L"--dry-run"});
     Require(aliases.ok && aliases.options.extension == L".pdf", "Aliases and normalized extension");
     Require(aliases.options.icon_index == 0, "Explicit icon zero is preserved");
-    Require(aliases.options.prog_id == L"DocBox.pdf" && aliases.options.dry_run, "Alias values");
+    Require(aliases.options.prog_id == L"SamplePdfReader.pdf" && aliases.options.dry_run, "Alias values");
     Require(aliases.options.experiment == "default", "Ordinary commands use the fixed default behavior");
 
     const auto unicode = Parse({L"dfa.exe", L"set-default", L"--ext=.文档", executable,
@@ -50,40 +50,40 @@ void Run() {
     const auto accented = Parse({L"dfa.exe", L"--ext=.ÉXT", executable, L"--dry-run"});
     Require(accented.ok && accented.options.extension == L".éxt", "Windows Unicode extension lowercase");
 
-    const auto check = Parse({L"dfa.exe", L"check", L"--ext=.pdf", L"--prog-id=DocBox.pdf"});
+    const auto check = Parse({L"dfa.exe", L"check", L"--ext=.pdf", L"--prog-id=SamplePdfReader.pdf"});
     Require(check.ok && check.options.check, "Check command without executable");
     const auto msbuild = Parse({L"dfa.exe", L"--msbuild", L"--ext=.pdf", executable,
-                                L"--prog-id=docboxtest.pdf", L"--dry-run"});
+                                L"--prog-id=samplepdfreader.pdf", L"--dry-run"});
     Require(msbuild.ok && msbuild.options.msbuild && !msbuild.options.use_hta && msbuild.options.icon_index == 1,
             "MSBuild mode defaults to icon 1 and excludes HTA");
-    Require(Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild preflight does not require reader registration");
-    Require(Parse({L"dfa.exe", L"--msbuild", L"--check", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(Parse({L"dfa.exe", L"--msbuild", L"--check", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild check selects new-format validation");
     Require(!Parse({L"dfa.exe", L"--msbuild", L"--ext=.txt", executable}).ok, "MSBuild rejects untested extensions");
-    Require(!Parse({L"dfa.exe", L"--msbuild", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(!Parse({L"dfa.exe", L"--msbuild", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "MSBuild and native probe cannot compete");
-    Require(!Parse({L"dfa.exe", L"--preflight", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(!Parse({L"dfa.exe", L"--preflight", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "Preflight requires MSBuild mode");
-    Require(!Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--check", L"--ext=.pdf", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(!Parse({L"dfa.exe", L"--msbuild", L"--preflight", L"--check", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf"}).ok,
             "Preflight and check cannot compete");
-    const auto latest = Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.PDF", L"--prog-id=docboxtest.pdf"});
+    const auto latest = Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.PDF", L"--prog-id=samplepdfreader.pdf"});
     Require(latest.ok && latest.options.latest_native_probe && !latest.options.use_hta,
             "Native latest experiment bypasses the legacy HTA path");
-    Require(Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf", L"--check"}).ok,
+    Require(Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf", L"--check"}).ok,
             "Native latest read-only validation");
-    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.txt", L"--prog-id=docboxtest.pdf"}).ok,
+    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.txt", L"--prog-id=samplepdfreader.pdf"}).ok,
             "Native latest experiment is limited to PDF");
     Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf"}).ok,
             "Native latest experiment requires explicit ProgID");
-    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf", executable}).ok,
+    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf", executable}).ok,
             "Native latest experiment cannot change handler registration");
-    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf", L"--diagnose"}).ok,
+    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf", L"--diagnose"}).ok,
             "Native latest experiment rejects competing diagnostic mode");
-    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=docboxtest.pdf", L"--dry-run"}).ok,
+    Require(!Parse({L"dfa.exe", L"--latest-native-probe", L"--ext=.pdf", L"--prog-id=samplepdfreader.pdf", L"--dry-run"}).ok,
             "Native latest experiment uses --check for read-only operation");
     Require(!Parse({L"dfa.exe", L"--check", L"--ext=.pdf"}).ok, "Check requires expected ProgID");
-    Require(!Parse({L"dfa.exe", L"--check", L"--ext=.pdf", L"--prog-id=DocBox.pdf", executable}).ok,
+    Require(!Parse({L"dfa.exe", L"--check", L"--ext=.pdf", L"--prog-id=SamplePdfReader.pdf", executable}).ok,
             "Check rejects executable options");
     Require(!Parse({L"dfa.exe", L"--ext=pdf", executable}).ok, "Extension requires leading dot");
     Require(!Parse({L"dfa.exe", L"--ext=.pdf", executable, L"--icon_idx=-1"}).ok, "Negative icon index");
@@ -108,12 +108,12 @@ void Run() {
                                         L"--experiment=" + std::wstring(mode), L"--log-file=中文日志.txt"});
         Require(experiment.ok && experiment.options.log_file == L"中文日志.txt", "Experiment and Unicode log path");
     }
-    const auto diagnose = Parse({L"dfa.exe", L"--diagnose", L"--ext=.pdf", L"--prog-id=DocBox.pdf"});
+    const auto diagnose = Parse({L"dfa.exe", L"--diagnose", L"--ext=.pdf", L"--prog-id=SamplePdfReader.pdf"});
     Require(diagnose.ok && diagnose.options.diagnose, "Read-only diagnosis without executable");
     Require(!Parse({L"dfa.exe", L"--diagnose", L"--ext=.pdf"}).ok, "Diagnosis requires ProgID");
-    Require(!Parse({L"dfa.exe", L"--diagnose", L"--check", L"--ext=.pdf", L"--prog-id=DocBox.pdf"}).ok,
+    Require(!Parse({L"dfa.exe", L"--diagnose", L"--check", L"--ext=.pdf", L"--prog-id=SamplePdfReader.pdf"}).ok,
             "Read-only modes are mutually exclusive");
-    Require(!Parse({L"dfa.exe", L"--check", L"--ext=.pdf", L"--prog-id=DocBox.pdf", L"--experiment=toasts"}).ok,
+    Require(!Parse({L"dfa.exe", L"--check", L"--ext=.pdf", L"--prog-id=SamplePdfReader.pdf", L"--experiment=toasts"}).ok,
             "Read-only checks reject modifying experiments");
     Require(!Parse({L"dfa.exe", L"--ext=.pdf", executable, L"--experiment=unknown"}).ok,
             "Unknown experiment rejected");

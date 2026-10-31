@@ -1,7 +1,7 @@
 """Authored by Codex. Explicit, sequential PDF host tests from a temporary ProgID.
 
-Keeps the same DocBox reader, preserves existing registration, and removes only
-the newly created control registration after restoring docboxtest.pdf.
+Keeps the same SamplePdfReader reader, preserves existing registration, and removes only
+the newly created control registration after restoring samplepdfreader.pdf.
 """
 import argparse
 import ctypes
@@ -24,8 +24,8 @@ def main():
     folder = root / 'research/evidence/host-probes'
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8]
-    control = 'docboxtest.control.' + uuid.uuid4().hex[:8]
-    target = 'docboxtest.pdf'
+    control = 'samplepdfreader.control.' + uuid.uuid4().hex[:8]
+    target = 'samplepdfreader.pdf'
     windows = Path(os.environ['SystemRoot'])
     framework = windows / 'Microsoft.NET/Framework64/v4.0.30319'
     checker = root / 'out/build/windows-x64-v143/Release/DefaultFileAssociation.exe'
@@ -70,8 +70,8 @@ def main():
         return json.loads(result.stdout.decode('utf-8-sig'))
 
     if current() != target or not check(target, 'initial'):
-        raise RuntimeError('Expected valid initial docboxtest.pdf; no changes attempted')
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\docboxtest.pdf\shell\open\command') as key:
+        raise RuntimeError('Expected valid initial samplepdfreader.pdf; no changes attempted')
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\samplepdfreader.pdf\shell\open\command') as key:
         original_command = winreg.QueryValueEx(key, '')[0]
     control_key = 'Software\\Classes\\' + control
     try:
@@ -100,7 +100,7 @@ def main():
                 if mode == 'write':
                     if not created:
                         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, control_key) as key:
-                            winreg.SetValueEx(key, '', 0, winreg.REG_SZ, 'DocBox temporary control')
+                            winreg.SetValueEx(key, '', 0, winreg.REG_SZ, 'SamplePdfReader temporary control')
                         created = True
                         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, control_key + r'\shell') as key:
                             winreg.SetValueEx(key, '', 0, winreg.REG_SZ, 'open')

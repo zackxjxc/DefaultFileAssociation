@@ -43,7 +43,7 @@ int wmain(int argc, wchar_t** argv) {
                 if (apply && name && CompareStringOrdinal(name, -1, argv[2], -1, TRUE) == CSTR_EQUAL) {
                     std::wprintf(L"calling_public_MakeDefault=true\n");
                     std::fflush(stdout);
-                    hr = handler->MakeDefault(ui ? ui : L"DocBox");
+                    hr = handler->MakeDefault(ui ? ui : L"SamplePdfReader");
                     std::wprintf(L"MakeDefault_hresult=0x%08lx\n", static_cast<unsigned long>(hr));
                     result = SUCCEEDED(hr) ? 0 : 6;
                     CoTaskMemFree(name); CoTaskMemFree(ui);
