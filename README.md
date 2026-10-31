@@ -1,5 +1,7 @@
 # DefaultFileAssociation
 
+[中文说明](README.zh-CN.md) · English
+
 `DefaultFileAssociation.exe` registers a per-user Windows file association and
 sets it as the current user's default when the Windows version permits the
 legacy `UserChoice` compatibility path. It is deliberately a user-level tool:
