@@ -21,11 +21,25 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Select installed Visual Studio generator
+        shell: pwsh
+        run: |
+          $help = cmake --help | Out-String
+          if ($help -match 'Visual Studio 18 2026') {
+              $generator = 'Visual Studio 18 2026'
+          } elseif ($help -match 'Visual Studio 17 2022') {
+              $generator = 'Visual Studio 17 2022'
+          } else {
+              throw 'No supported Visual Studio generator was found on the runner.'
+          }
+          "DFA_CMAKE_GENERATOR=$generator" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Using CMake generator: $generator"
+
       - name: Configure x86 tests
         shell: pwsh
         run: >-
           cmake -S . -B out/ci-x86
-          -G "Visual Studio 17 2022" -A Win32 -T v143
+          -G "$env:DFA_CMAKE_GENERATOR" -A Win32 -T v143
           -DBUILD_TESTING=ON -DDFA_FETCH_DEPENDENCIES=ON
 
       - name: Build x86 tests and release binary
@@ -40,7 +54,7 @@ jobs:
         shell: pwsh
         run: >-
           cmake -S . -B out/ci-x64
-          -G "Visual Studio 17 2022" -A x64 -T v143
+          -G "$env:DFA_CMAKE_GENERATOR" -A x64 -T v143
           -DBUILD_TESTING=OFF -DDFA_FETCH_DEPENDENCIES=ON
 
       - name: Build x64 release binary
