@@ -62,11 +62,11 @@ def main() -> None:
         "NOTICE": root / "NOTICE",
         "CHANGELOG.md": root / "CHANGELOG.md",
         "docs/msbuild-vm-test-package.md": root / "docs/msbuild-vm-test-package.md",
-        "012.pdf": root / "test_case/012.pdf",
         "test-msbuild-package.ps1": root / "test_case/test-msbuild-package.ps1",
         "test-msbuild-menu.bat": root / "test_case/test-msbuild-menu.bat",
     }
     optional = {
+        "012.pdf": root / "test_case/012.pdf",
         "SamplePdfReader.exe": root / "test_case/SamplePdfReader.exe",
         "libsamplepdfreader.dll": root / "test_case/libsamplepdfreader.dll",
     }
