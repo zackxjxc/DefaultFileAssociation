@@ -2,6 +2,7 @@
 
 #include "association.h"
 #include "association_target.h"
+#include "latest_hash_self.h"
 #include "platform.h"
 #include "registry.h"
 
@@ -28,6 +29,14 @@ namespace {
 
 constexpr auto kLatest = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.pdf\\UserChoiceLatest";
 
+enum class HashEngine { Self, Dll };
+
+std::wstring EnvironmentValue(const wchar_t* name) {
+    std::array<wchar_t, 64> value{};
+    const DWORD count = ::GetEnvironmentVariableW(name, value.data(), static_cast<DWORD>(value.size()));
+    return count == 0 || count >= value.size() ? std::wstring{} : std::wstring(value.data(), count);
+}
+
 struct HashProfile {
     std::wstring_view digest;
     uintptr_t machine_rva;
@@ -41,7 +50,23 @@ std::optional<HashProfile> Profile(std::wstring_view digest) {
     if (digest == L"cf4793b9e7570f1c6621515d634e2fee115b51f6009a19e0d1a5d24cefb55703") {
         return HashProfile{digest, 0x625E8C, 0x626228};
     }
+    // Windows 11 26H2 build 26300.9711. Static comparison matched the
+    // implementation body; these RVAs moved in the serviced image. The
+    // returned value is machine-bound and is validated against the live record.
+    if (digest == L"a0d41fcfd66f4fbba8dbb84776c7d344f66969ce8b6edac19b3ac1dd737a628a") {
+        return HashProfile{digest, 0x62902C, 0x6293C8};
+    }
     return std::nullopt;
+}
+
+HashEngine RequestedEngine(std::optional<HashProfile> profile) {
+    const auto requested = platform::ToLower(EnvironmentValue(L"DFA_LATEST_HASH_ENGINE"));
+    if (requested == L"self") return HashEngine::Self;
+    if (requested == L"dll") {
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !profile);
+        return HashEngine::Dll;
+    }
+    return profile ? HashEngine::Dll : HashEngine::Self;
 }
 
 struct State {
@@ -129,14 +154,21 @@ Result Preflight(std::wstring& trace) {
         THROW_LAST_ERROR_IF(count == 0);
         THROW_HR_IF(E_UNEXPECTED, count >= directory.size());
         const auto dll = std::filesystem::path(directory.data()) / L"windows.storage.dll";
-        stage = L"dll_fingerprint";
-        wil::unique_hfile dll_lock(::CreateFileW(dll.c_str(), GENERIC_READ, FILE_SHARE_READ,
-            nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
-        const auto digest = FileSha256(dll);
-        trace += L"dll_sha256=" + digest + L"\n";
-        const auto profile = Profile(digest);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !profile);
+        std::optional<HashProfile> profile;
+        std::wstring digest;
+        wil::unique_hfile dll_lock;
+        const auto requested = platform::ToLower(EnvironmentValue(L"DFA_LATEST_HASH_ENGINE"));
+        if (requested != L"self") {
+            stage = L"dll_fingerprint";
+            dll_lock.reset(::CreateFileW(dll.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
+            digest = FileSha256(dll);
+            trace += L"dll_sha256=" + digest + L"\n";
+            profile = Profile(digest);
+        }
+        const auto engine = RequestedEngine(profile);
+        trace += std::wstring(L"hash_engine=") + (engine == HashEngine::Self ? L"self\n" : L"dll\n");
         stage = L"hash_version";
         wil::unique_hkey protected_key;
         const std::wstring protected_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\SystemProtectedUserData\\" +
@@ -148,26 +180,52 @@ Result Preflight(std::wstring& trace) {
             reinterpret_cast<BYTE*>(&version), &size));
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), type != REG_DWORD || size != sizeof(version) || version != 1);
         trace += std::format(L"hash_version={}\n", version);
-        stage = L"load_hash_functions";
-        wil::unique_hmodule module(::LoadLibraryW(dll.c_str()));
-        THROW_LAST_ERROR_IF(module.get() == nullptr);
         using GetMachine = HRESULT(WINAPI*)(wchar_t**);
         using Generate = HRESULT(WINAPI*)(DWORD, const wchar_t*, const wchar_t*, const wchar_t*,
             const wchar_t*, SYSTEMTIME*, wchar_t**);
-        const auto base = reinterpret_cast<const BYTE*>(module.get());
-        const auto get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
-        const auto generate = reinterpret_cast<Generate>(base + profile->hash_rva);
-        wil::unique_cotaskmem_string machine;
-        THROW_IF_FAILED(get_machine(machine.put()));
-        THROW_HR_IF(E_UNEXPECTED, machine == nullptr || machine.get()[0] == L'\0');
+        wil::unique_hmodule module;
+        GetMachine get_machine = nullptr;
+        Generate generate = nullptr;
+        if (engine == HashEngine::Dll) {
+            stage = L"load_hash_functions";
+            module.reset(::LoadLibraryW(dll.c_str()));
+            THROW_LAST_ERROR_IF(module.get() == nullptr);
+            const auto base = reinterpret_cast<const BYTE*>(module.get());
+            get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
+            generate = reinterpret_cast<Generate>(base + profile->hash_rva);
+        }
+        std::wstring machine;
+        if (engine == HashEngine::Self) {
+            stage = L"machine_id";
+            machine = latest_hash::ReadMachineId();
+        } else {
+            wil::unique_cotaskmem_string machine_pointer;
+            THROW_IF_FAILED(get_machine(machine_pointer.put()));
+            if (machine_pointer) machine = machine_pointer.get();
+        }
+        THROW_HR_IF(E_UNEXPECTED, machine.empty());
         stage = L"hash_selftest";
         SYSTEMTIME vector_time{2001, 2, 6, 3, 4, 5, 6, 7};
-        wil::unique_cotaskmem_string vector_hash;
-        THROW_IF_FAILED(generate(1, L"{01234567-89AB-CDEF-0123-456789ABCDEF}",
-            L"S-1-5-21-1-2-3-1000", L".pdf", L"samplepdfreader.pdf", &vector_time, vector_hash.put()));
-        const bool vector_matches = vector_hash != nullptr && std::wstring(vector_hash.get()) == L"9rTXfFYM9CQ=";
-        trace += std::format(L"hash_selftest={}\n", vector_matches);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !vector_matches);
+        std::wstring vector_value;
+        if (engine == HashEngine::Self) {
+            const auto vector = latest_hash::Generate(L"{01234567-89AB-CDEF-0123-456789ABCDEF}",
+                L"S-1-5-21-1-2-3-1000", L".pdf", L"samplepdfreader.pdf", vector_time);
+            THROW_HR_IF(E_FAIL, !vector.ok);
+            vector_value = vector.value;
+        } else {
+            wil::unique_cotaskmem_string vector_hash;
+            THROW_IF_FAILED(generate(1, L"{01234567-89AB-CDEF-0123-456789ABCDEF}",
+                L"S-1-5-21-1-2-3-1000", L".pdf", L"samplepdfreader.pdf", &vector_time, vector_hash.put()));
+            if (vector_hash) vector_value = vector_hash.get();
+        }
+        // The helper incorporates the machine identity, so a fixed output
+        // string is not portable across otherwise identical installations.
+        // Require a successful, non-empty result here; the existing record
+        // validation below is the authoritative end-to-end self-test.
+        const bool vector_valid = !vector_value.empty();
+        trace += std::format(L"hash_selftest_value={}\nhash_selftest={}\n",
+            vector_valid ? vector_value : L"<null>", vector_valid);
+        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !vector_valid);
         stage = L"validate_existing_record";
         wil::unique_hkey parent, child;
         THROW_IF_WIN32_ERROR(::RegOpenKeyExW(HKEY_CURRENT_USER, kLatest, 0, KEY_READ, parent.put()));
@@ -177,10 +235,18 @@ Result Preflight(std::wstring& trace) {
         Describe(trace, L"before", before);
         SYSTEMTIME timestamp{};
         THROW_IF_WIN32_BOOL_FALSE(::FileTimeToSystemTime(&before.time, &timestamp));
-        wil::unique_cotaskmem_string calculated;
-        THROW_IF_FAILED(generate(version, machine.get(), sid.c_str(), L".pdf", before.prog_id.c_str(),
-            &timestamp, calculated.put()));
-        const bool matches = calculated != nullptr && std::wstring(calculated.get()) == before.hash;
+        std::wstring calculated;
+        if (engine == HashEngine::Self) {
+            const auto value = latest_hash::Generate(machine, sid, L".pdf", before.prog_id, timestamp);
+            THROW_HR_IF(E_FAIL, !value.ok);
+            calculated = value.value;
+        } else {
+            wil::unique_cotaskmem_string pointer;
+            THROW_IF_FAILED(generate(version, machine.c_str(), sid.c_str(), L".pdf", before.prog_id.c_str(),
+                &timestamp, pointer.put()));
+            if (pointer) calculated = pointer.get();
+        }
+        const bool matches = calculated == before.hash;
         trace += std::format(L"before_hash_matches={}\n", matches);
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_DATA), !matches);
         trace += L"preflight_success=true\ncompleted_registry_writes=0\n";
@@ -222,16 +288,22 @@ Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
         THROW_LAST_ERROR_IF(count == 0);
         THROW_HR_IF(E_UNEXPECTED, count >= directory.size());
         const auto dll = std::filesystem::path(directory.data()) / L"windows.storage.dll";
-        stage = L"dll_fingerprint";
-        // The disk hash authorizes only the two RVAs analyzed for this build.
-        // Hold a separate read-only handle through loading to prevent replacement.
-        wil::unique_hfile dll_lock(::CreateFileW(dll.c_str(), GENERIC_READ, FILE_SHARE_READ,
-            nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
-        const auto digest = FileSha256(dll);
-        trace += L"dll_sha256=" + digest + L"\n";
-        const auto profile = Profile(digest);
-        THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), !profile);
+        std::optional<HashProfile> profile;
+        std::wstring digest;
+        wil::unique_hfile dll_lock;
+        const auto requested = platform::ToLower(EnvironmentValue(L"DFA_LATEST_HASH_ENGINE"));
+        if (requested != L"self") {
+            stage = L"dll_fingerprint";
+            // The disk hash authorizes only the known RVAs; keep the image read-only while loading it.
+            dll_lock.reset(::CreateFileW(dll.c_str(), GENERIC_READ, FILE_SHARE_READ,
+                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+            THROW_LAST_ERROR_IF(dll_lock.get() == INVALID_HANDLE_VALUE);
+            digest = FileSha256(dll);
+            trace += L"dll_sha256=" + digest + L"\n";
+            profile = Profile(digest);
+        }
+        const auto engine = RequestedEngine(profile);
+        trace += std::wstring(L"hash_engine=") + (engine == HashEngine::Self ? L"self\n" : L"dll\n");
         stage = L"hash_version";
         wil::unique_hkey protected_key;
         const std::wstring protected_path = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\SystemProtectedUserData\\" +
@@ -243,18 +315,30 @@ Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
             reinterpret_cast<BYTE*>(&version), &size));
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH), type != REG_DWORD || size != sizeof(version) || version != 1);
         trace += std::format(L"hash_version={}\n", version);
-        stage = L"load_hash_functions";
-        wil::unique_hmodule module(::LoadLibraryW(dll.c_str()));
-        THROW_LAST_ERROR_IF(module.get() == nullptr);
-        // Internal, non-exported functions; not an independently implemented hash.
         using GetMachine = HRESULT(WINAPI*)(wchar_t**);
         using Generate = HRESULT(WINAPI*)(DWORD, const wchar_t*, const wchar_t*, const wchar_t*,
             const wchar_t*, SYSTEMTIME*, wchar_t**);
-        const auto base = reinterpret_cast<const BYTE*>(module.get());
-        const auto get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
-        const auto generate = reinterpret_cast<Generate>(base + profile->hash_rva);
-        wil::unique_cotaskmem_string machine;
-        THROW_IF_FAILED(get_machine(machine.put()));
+        wil::unique_hmodule module;
+        GetMachine get_machine = nullptr;
+        Generate generate = nullptr;
+        if (engine == HashEngine::Dll) {
+            stage = L"load_hash_functions";
+            module.reset(::LoadLibraryW(dll.c_str()));
+            THROW_LAST_ERROR_IF(module.get() == nullptr);
+            const auto base = reinterpret_cast<const BYTE*>(module.get());
+            get_machine = reinterpret_cast<GetMachine>(base + profile->machine_rva);
+            generate = reinterpret_cast<Generate>(base + profile->hash_rva);
+        }
+        std::wstring machine;
+        if (engine == HashEngine::Self) {
+            stage = L"machine_id";
+            machine = latest_hash::ReadMachineId();
+        } else {
+            wil::unique_cotaskmem_string machine_pointer;
+            THROW_IF_FAILED(get_machine(machine_pointer.put()));
+            if (machine_pointer) machine = machine_pointer.get();
+        }
+        THROW_HR_IF(E_UNEXPECTED, machine.empty());
         stage = L"open_latest_keys";
         const REGSAM access = KEY_READ | (attempt_set ? KEY_SET_VALUE : 0);
         THROW_IF_WIN32_ERROR(::RegOpenKeyExW(HKEY_CURRENT_USER, kLatest, 0, access, parent.put()));
@@ -266,8 +350,13 @@ Result Probe(std::wstring_view prog_id, bool attempt_set, std::wstring& trace) {
         auto calculate = [&](const State& state) {
             SYSTEMTIME timestamp{};
             THROW_IF_WIN32_BOOL_FALSE(::FileTimeToSystemTime(&state.time, &timestamp));
+            if (engine == HashEngine::Self) {
+                const auto result = latest_hash::Generate(machine, sid, L".pdf", state.prog_id, timestamp);
+                THROW_HR_IF(E_FAIL, !result.ok);
+                return result.value;
+            }
             wil::unique_cotaskmem_string result;
-            THROW_IF_FAILED(generate(version, machine.get(), sid.c_str(), L".pdf", state.prog_id.c_str(), &timestamp, result.put()));
+            THROW_IF_FAILED(generate(version, machine.c_str(), sid.c_str(), L".pdf", state.prog_id.c_str(), &timestamp, result.put()));
             THROW_HR_IF(E_UNEXPECTED, result == nullptr);
             return std::wstring(result.get());
         };

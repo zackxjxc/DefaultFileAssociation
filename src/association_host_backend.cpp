@@ -76,9 +76,31 @@ std::wstring ReadText(const std::filesystem::path& path) {
     return result;
 }
 
+enum class HashLayout {
+    Legacy,
+    Latest,
+};
+
+HashLayout DetectHashLayout() noexcept {
+    constexpr wchar_t kLatest[] =
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.pdf\\UserChoiceLatest";
+    HKEY key = nullptr;
+    const auto status = ::RegOpenKeyExW(HKEY_CURRENT_USER, kLatest, 0, KEY_READ, &key);
+    if (status == ERROR_SUCCESS) {
+        ::RegCloseKey(key);
+        return HashLayout::Latest;
+    }
+    return HashLayout::Legacy;
+}
+
+std::wstring_view HashLayoutName(HashLayout layout) noexcept {
+    return layout == HashLayout::Latest ? L"latest" : L"legacy";
+}
+
 std::vector<wchar_t> Environment(std::wstring_view mode, std::wstring_view prog_id,
                                  const std::filesystem::path& report,
-                                 const std::filesystem::path& native_dll) {
+                                 const std::filesystem::path& native_dll,
+                                 HashLayout layout) {
     wil::unique_environstrings_ptr current(::GetEnvironmentStringsW());
     THROW_LAST_ERROR_IF(current == nullptr);
     std::vector<std::wstring> values;
@@ -89,6 +111,7 @@ std::vector<wchar_t> Environment(std::wstring_view mode, std::wstring_view prog_
     values.emplace_back(L"DFA_HOST_PROBE_PROGID=" + std::wstring(prog_id));
     values.emplace_back(L"DFA_HOST_PROBE_REPORT=" + report.wstring());
     values.emplace_back(L"DFA_HOST_PROBE_DLL=" + native_dll.wstring());
+    values.emplace_back(L"DFA_HOST_PROBE_ALGORITHM=" + std::wstring(HashLayoutName(layout)));
     std::ranges::sort(values, [](const auto& left, const auto& right) {
         return _wcsicmp(left.c_str(), right.c_str()) < 0;
     });
@@ -155,7 +178,8 @@ DWORD FailureCode(DWORD exit_code) noexcept {
     return ERROR_GEN_FAILURE;
 }
 
-Invocation Invoke(Host host, Mode mode, std::wstring_view prog_id, std::wstring& trace) {
+Invocation Invoke(Host host, Mode mode, std::wstring_view prog_id, HashLayout layout,
+                  std::wstring& trace) {
     const auto files = Files(host);
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !std::filesystem::is_regular_file(files.executable));
     THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !std::filesystem::is_regular_file(files.native_dll));
@@ -171,7 +195,7 @@ Invocation Invoke(Host host, Mode mode, std::wstring_view prog_id, std::wstring&
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT), !response);
     }
     const auto operation = mode == Mode::Preflight ? L"preflight" : mode == Mode::Set ? L"write" : L"read";
-    auto environment = Environment(operation, prog_id, workspace.report, files.native_dll);
+    auto environment = Environment(operation, prog_id, workspace.report, files.native_dll, layout);
     std::wstring command = platform::QuoteCommandLineArgument(files.executable.wstring());
     switch (host) {
     case Host::InstallUtil:
@@ -296,8 +320,10 @@ Result Run(const association::Specification& request, Host host, Mode mode, std:
         THROW_HR_IF(E_INVALIDARG, request.extension != L".pdf" || request.prog_id.empty());
         THROW_HR_IF(E_ACCESSDENIED, platform::IsProcessElevated());
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !platform::Is64BitWindows() || sizeof(void*) != 8);
+        const auto layout = DetectHashLayout();
+        trace += L"hash_layout=" + std::wstring(HashLayoutName(layout)) + L"\n";
         if (mode != Mode::Check) {
-            const auto preflight = Invoke(host, Mode::Preflight, request.prog_id, trace);
+            const auto preflight = Invoke(host, Mode::Preflight, request.prog_id, layout, trace);
             if (preflight.exit_code != 0 || !preflight.callback_success) {
                 return {Status::Failed, L"Selected association host preflight failed; registration and default were not changed.",
                     FailureCode(preflight.exit_code), false};
@@ -309,7 +335,7 @@ Result Run(const association::Specification& request, Host host, Mode mode, std:
             if (registered.status == Status::Failed) return registered;
         }
         const auto invocation = Invoke(host, mode == Mode::Set ? Mode::Set : Mode::Check,
-                                       request.prog_id, trace);
+                                       request.prog_id, layout, trace);
         if (invocation.exit_code != 0 || !invocation.callback_success) {
             return {Status::Failed, L"Selected association host failed; see the host report.", FailureCode(invocation.exit_code), false};
         }

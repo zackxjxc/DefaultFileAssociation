@@ -4,6 +4,8 @@
 
 `DefaultFileAssociation.exe` 用当前用户权限注册 Windows 文件关联，并在系统允许旧版 `UserChoice` 兼容路径时设置当前用户的默认程序。工具不会请求管理员权限；如果进程已经提升，会直接退出，避免把关联写入错误的管理员用户配置。
 
+针对 Windows 11 26H2 的部分已验证构建，项目还找到了一些可以用**普通用户权限设置默认浏览器关联**的实验性方案。相关方案仍处于研究阶段，不保证稳定性或跨版本兼容性。
+
 ## 构建
 
 项目使用 C++23、CMake 和 Visual Studio 2026 的 **v143（VS 2022）** 工具集，目标为 Windows 7 SP1 及以上版本。请在 Visual Studio Installer 的单个组件中安装 v143 x64/x86 构建工具。默认的 VS 2026 v145 运行库需要 Windows 10，并会导入 Windows 7 不具备的 API；仅定义 `_WIN32_WINNT` 不能改变预编译运行库的要求。
@@ -75,15 +77,19 @@ DefaultFileAssociation.exe --browser="Google Chrome" --check
 
 ## Windows 11 研究状态
 
-EXE 内嵌了 Framework64 MSBuild PDF 后端，也支持四种可选择的系统宿主后端。使用这些后端时，程序会先进行版本兼容性检查，再注册候选程序、写入新格式记录，并验证 Hash 与有效 Shell 处理器。默认图标序号是 **1**：
+针对 Windows 11 26H2 的部分已验证构建，本项目已经找到几种可以在**普通用户权限**下尝试设置默认打开方式（包括默认浏览器相关关联）的实验性方案。这些方案仍处于研究阶段，不保证稳定性、跨版本兼容性，或在所有系统安全策略下都能使用。
+
+默认浏览器演示使用 `--browser`，名称必须是浏览器在 `RegisteredApplications` 中的注册名称，例如 `Google Chrome`：
 
 ```powershell
-DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
-DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe" --icon-index=1 --log-file=set.log
-DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation.exe --browser="Google Chrome" --dry-run
+DefaultFileAssociation.exe --browser="Google Chrome" --log-file=browser.log
+DefaultFileAssociation.exe --browser="Google Chrome" --check --log-file=browser-check.log
 ```
 
-四种宿主使用同样的参数和三个操作阶段，只需把 `--msbuild` 换成 `--backend=<name>`：
+浏览器模式会复用已安装浏览器的 Capabilities，依次处理 `http`、`https`、`.htm` 和 `.html` 四项关联，不要求传入 EXE、ProgID 或图标参数。MSBuild 和四种宿主后端属于 PDF 专用研究路线，不能与 `--browser` 组合；运行时会根据当前机器的 UserChoice 结构选择旧哈希或新哈希路径。
+
+PDF 后端使用同样的参数和三个操作阶段，只需把 `--msbuild` 换成 `--backend=<name>`：
 
 ```powershell
 DefaultFileAssociation-x64.exe --backend=installutil --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
@@ -94,7 +100,7 @@ DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfr
 
 可用名称为 `msbuild`、`installutil`、`regsvr32`、`odbcconf` 和 `msiexec`；`--msbuild` 是 `--backend=msbuild` 的兼容别名。四种新增路线分别使用托管宿主 DLL 或原生宿主 DLL，DLL 会随构建输出放在 EXE 旁边。它们只支持 `.pdf`、`DefaultFileAssociation-x64.exe` 和普通用户权限；x86 EXE 会拒绝这些模式。
 
-这些新格式后端都要求 `HashVersion=1` 和精确匹配的 `windows.storage.dll` 指纹。未知版本会在注册前拒绝继续；设置失败不会自动回退到旧路径。MSBuild 任务嵌入 EXE，其他宿主使用随 EXE 构建的 `DfaAssociationHost-*.dll` 和 `DfaAssociationManagedHost-*.dll`，运行时不需要 Python 或 Visual Studio。[虚拟机测试包说明](docs/msbuild-vm-test-package.md)。
+新结构后端要求 `HashVersion=1`；已知 `windows.storage.dll` 指纹优先调用系统内部实现，未知指纹则改用项目内置的 26H2 独立实现，并在写入后重新计算和验证 live `UserChoiceLatest` 记录。独立实现属于实验性兼容路径，不能保证适用于所有 Windows 服务版本。MSBuild 任务嵌入 EXE，其他宿主使用随 EXE 构建的 `DfaAssociationHost-*.dll` 和 `DfaAssociationManagedHost-*.dll`，运行时不需要 Python 或 Visual Studio。[虚拟机测试包说明](docs/msbuild-vm-test-package.md)。
 
 独立的 `--latest-native-probe` 仍只用于特定构建的研究验证；已测试主机上的直接写入被拒绝。旧设置路径不实现 `UserChoiceLatest`。HTA 和工作流编译器路线已经从当前研究计划中排除。
 
@@ -112,7 +118,9 @@ DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfr
 
 `--diagnose` 会在不写入的情况下报告两层 Hash：`legacy_hash_profile` 表示根据系统版本选择的 Legacy、Windows 10 Threshold 1 或 Threshold 2 及以上算法；`latest_hash_version` 和 `hash_profile` 表示是否检测到经过验证的 `UserChoiceLatest` 记录。只有受保护的 `HashVersion` 值和记录结构同时存在时，才认为新结构已启用；不能只根据 OS build 判断。
 
-“Windows 11 26H2 UCPD 破解”不是本项目支持的产品声明。当前主机 `26300.9711` 只有只读 Hash 校验脚本；产品会拒绝调用尚未完成验证的新写入指纹。Framework64 MSBuild 实验也不能描述为最新 Windows 11 的通用方案。未知构建会在调用内部地址前失败。
+“Windows 11 26H2 UCPD 破解”不是本项目支持的产品声明。当前已对 `26300.9711` 和本机 `26H2` 的普通用户写入流程完成实验验证；未知 DLL 不会调用未经确认的内部地址，而是尝试独立算法并以 live 记录校验结果。该实验仍不能描述为最新 Windows 11 的通用方案。
+
+`UserChoiceLatest` 独立实现的计算顺序是：读取 `HKLM\SOFTWARE\Microsoft\SQMClient\MachineId` 并去除外层花括号；按机器 ID 的最后一个 UTF-16 单元选择 3 条版本表之一；按表内排列拼接扩展名、SID、ProgID、UTC FILETIME 高低 DWORD 的 16 位小写十六进制文本、Microsoft 固定种子和 Machine ID，整体转小写；用 26H2 的变宽码表和回溯压缩器生成 UTF-16 字符串；把压缩字符串连同结尾 NUL 作为 UTF-16LE 输入做 MD5；取 MD5 前 8 字节作为两条 CS64 混合链的种子，逐 32 位小端字处理后将两条 64 位结果异或；最后对 8 字节结果做标准 Base64，得到写入 `Hash` 的值。Machine ID 是 Windows SQM 遥测标识，不是密码学唯一标识，可能因克隆、重装或策略变化而改变，也不建议作为其他应用的长期唯一身份。
 
 ## GitHub 版本打包
 
@@ -139,8 +147,9 @@ GitHub Actions 会在推送 `v主版本.次版本.修订版本` 格式的 tag �
 - `src/association_target.h`：共享文件/协议 UserChoice 路径和 ProgID 校验。
 - `src/association.*`：注册 ProgID、图标、打开命令、Capabilities 和 Explorer 记录。
 - `src/user_choice.*`：验证并写入版本化 UserChoice Hash，并保留 HTA 回退接口。
+- `src/latest_hash_self.*`：读取 Machine ID，并实现独立的 26H2 UserChoiceLatest 压缩和 Hash。
 - `src/crypto/`：Windows CNG/crypt32 封装和 UserChoice Hash 实现。
-- `tests/`：Hash 向量、命令行、注册表、关联和浏览器回归测试。
+- `tests/`：旧 Hash 向量、独立 UserChoiceLatest 向量、命令行、注册表、关联和浏览器回归测试。
 
 EXE 和测试程序链接同一个 `dfa_core` 静态库。注册表集成测试使用私有键；UserChoice 测试在进程内重定向 HKCU，不启动 HTA。真实 Windows 7/8/10/11 验证仍然必要，尤其是 UserChoice 保护发生变化时。
 

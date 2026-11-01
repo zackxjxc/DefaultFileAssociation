@@ -50,14 +50,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\test-msbuild-package.p
 
 ## 版本限制
 
-当前仅支持 HashVersion=1 和以下两个 windows.storage.dll SHA-256：
+最新 UserChoiceLatest 路线当前仅支持 HashVersion=1 和以下三个已研究的 windows.storage.dll SHA-256：
 
 - `8d6ac2b451af71e913665c8459935ac862e219458f0962c99f3a3d48ab9c251b`：本机已验证的内部函数版本。
 - `cf4793b9e7570f1c6621515d634e2fee115b51f6009a19e0d1a5d24cefb55703`：用户提供的 26H2 ISO 版本，两个函数地址已静态匹配，实际 VM 设置仍待验证。
+- `a0d41fcfd66f4fbba8dbb84776c7d344f66969ce8b6edac19b3ac1dd737a628a`：Windows 11 26H2 build 26300.9711，已完成普通用户写入和 Shell 复查。
 
-预检还会用固定输入执行 Hash 自检，并核验已有记录的 Hash。固定自检不能代替实际关联写入和重启后的验证。
+预检会调用精确版本的 Hash 函数并核验已有记录的 Hash；函数输出包含机器标识，固定字符串不能作为跨机器的唯一判断。已有记录必须能够按当前机器和实际键时间重算匹配，才会继续写入。
 
-未知指纹、未确认新格式迁移、无效的已有 Hash 会在设置注册前拒绝。无效记录可先由用户在 Windows 设置中建立一个正常默认程序，再预检。不会把系统组件副本放进包里，不会更换系统 DLL、改 UCPD/Defender、回退 HTA，也不会自动打开 PDF。
+旧 `UserChoice` 结构（没有 `UserChoiceLatest`）不调用上述内部 DLL 函数，而是使用项目已有的旧哈希算法；MSBuild 和四种 DLL 宿主会在相应宿主进程中执行这条旧路径。未知最新指纹会进入项目内置的 26H2 独立算法，并以 live `UserChoiceLatest` 记录复查结果；未确认新格式迁移或无效的已有 Hash 仍会在设置注册前拒绝。不会把系统组件副本放进包里，不会更换系统 DLL、改 UCPD/Defender、回退 HTA，也不会自动打开 PDF。
 
 设置不是事务：候选注册成功后，后续默认写入可能失败；报告如实返回非零并保留失败阶段。manifest.json 提供源码提交号和包内文件 SHA-256。测试包是实验交付，不代表已完成跨版本、持久性或全部防护环境验证。
 
@@ -75,13 +76,13 @@ MSBuild 相同：
 .\DefaultFileAssociation-x64.exe --backend=msiexec --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\DFA Test\SamplePdfReader.exe"
 ```
 
-这些模式当前要求 x64 构建、64 位 Windows、普通用户、HashVersion 1 和已支持的
-`windows.storage.dll` 指纹。预检失败时不会注册候选程序；设置失败时不会自动切换到
-Legacy 或 MSBuild。真实部署前应在保留 Defender 和 UCPD 的 VM 中分别记录宿主退出码、
+这些模式当前要求 x64 构建、64 位 Windows 和普通用户；最新结构要求 HashVersion 1，
+已知 DLL 使用系统实现，未知 DLL 尝试独立算法，旧结构使用 Legacy 哈希。预检失败时不会注册
+候选程序；设置失败时不会静默切换到另一种结构。真实部署前应在保留 Defender 和 UCPD 的 VM 中分别记录宿主退出码、
 Hash/Shell 复查、首次设置、重启持久性和安全中心事件。
 
 ## 本次交付验证
 
-2026-10-14：x86/x64 Release 构建及静态 API 导入检查通过，6 项 CTest 通过。图标测试同时核对 DefaultIcon 和 ApplicationIcon 的序号 1。集成 EXE 在本机通过 Preflight/Check，包括固定 Hash 自检、已有记录 Hash 和 Shell 有效关联校验；子任务均报告 0 次注册表写入。
+2026-11-01：x86/x64 Release 构建及静态 API 导入检查通过，7 项 CTest 通过，其中新增独立 UserChoiceLatest 固定向量测试。图标测试同时核对 DefaultIcon 和 ApplicationIcon 的序号 1。集成 EXE 在本机通过 Preflight/Check，包括独立 Hash 自检、已有记录 Hash 和 Shell 有效关联校验；本机 MSBuild/InstallUtil DocBox 设置和恢复均报告成功。
 
-便携脚本已在 Windows PowerShell 5.1 下预检，包含中文和空格的目录可运行。本次集成版本没有在本机执行 Set，也没有自动打开 PDF；首次切换、图标实际显示、告警和重启持久性由 VM 完整测试确认。
+便携脚本已在 Windows PowerShell 5.1 下预检，包含中文和空格的目录可运行。本轮本机 Set 仅用于临时 DocBox 关联验证，随后已恢复原 ProgID；没有自动打开 PDF。首次切换、图标实际显示、告警和重启持久性仍由 VM 完整测试确认。

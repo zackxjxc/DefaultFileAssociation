@@ -62,8 +62,38 @@ std::wstring ReadText(const std::filesystem::path& path) {
     return result;
 }
 
+enum class HashLayout {
+    Legacy,
+    Latest,
+};
+
+HashLayout DetectHashLayout() noexcept {
+    constexpr wchar_t kLatest[] =
+        L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\.pdf\\UserChoiceLatest";
+    HKEY key = nullptr;
+    const auto status = ::RegOpenKeyExW(HKEY_CURRENT_USER, kLatest, 0, KEY_READ, &key);
+    if (status == ERROR_SUCCESS) {
+        ::RegCloseKey(key);
+        return HashLayout::Latest;
+    }
+    return HashLayout::Legacy;
+}
+
+std::wstring_view HashLayoutName(HashLayout layout) noexcept {
+    return layout == HashLayout::Latest ? L"latest" : L"legacy";
+}
+
+std::filesystem::path CurrentExecutableDirectory() {
+    std::array<wchar_t, MAX_PATH> path{};
+    const DWORD count = ::GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+    THROW_LAST_ERROR_IF(count == 0 || count >= path.size());
+    return std::filesystem::path(path.data()).parent_path();
+}
+
 std::vector<wchar_t> Environment(std::wstring_view mode, std::wstring_view prog_id,
-                                  const std::filesystem::path& report) {
+                                  const std::filesystem::path& report,
+                                  HashLayout layout,
+                                  const std::filesystem::path& native_dll) {
     wil::unique_environstrings_ptr environment(::GetEnvironmentStringsW());
     THROW_LAST_ERROR_IF(environment == nullptr);
     std::vector<std::wstring> values;
@@ -73,6 +103,8 @@ std::vector<wchar_t> Environment(std::wstring_view mode, std::wstring_view prog_
     values.emplace_back(L"DFA_MSB_MODE=" + std::wstring(mode));
     values.emplace_back(L"DFA_MSB_PROGID=" + std::wstring(prog_id));
     values.emplace_back(L"DFA_MSB_REPORT=" + report.wstring());
+    values.emplace_back(L"DFA_MSB_ALGORITHM=" + std::wstring(HashLayoutName(layout)));
+    values.emplace_back(L"DFA_MSB_DLL=" + native_dll.wstring());
     std::ranges::sort(values, [](const auto& left, const auto& right) { return _wcsicmp(left.c_str(), right.c_str()) < 0; });
     std::vector<wchar_t> block;
     for (const auto& value : values) {
@@ -83,7 +115,8 @@ std::vector<wchar_t> Environment(std::wstring_view mode, std::wstring_view prog_
     return block;
 }
 
-DWORD Invoke(std::wstring_view prog_id, std::wstring_view mode, std::wstring& trace) {
+DWORD Invoke(std::wstring_view prog_id, std::wstring_view mode, HashLayout layout,
+             std::wstring& trace) {
     std::array<wchar_t, MAX_PATH> windows{};
     const auto count = ::GetWindowsDirectoryW(windows.data(), static_cast<UINT>(windows.size()));
     THROW_LAST_ERROR_IF(count == 0);
@@ -122,7 +155,9 @@ DWORD Invoke(std::wstring_view prog_id, std::wstring_view mode, std::wstring& tr
     startup.lpAttributeList = attributes;
     auto command = platform::QuoteCommandLineArgument(host.wstring()) + L" " +
         platform::QuoteCommandLineArgument(workspace.project.wstring()) + L" /ToolsVersion:4.0 /nologo /v:quiet /nodeReuse:false";
-    auto environment = Environment(mode, prog_id, workspace.report);
+    const auto native_dll = CurrentExecutableDirectory() / L"DfaAssociationHost-x64.dll";
+    THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND), !std::filesystem::is_regular_file(native_dll));
+    auto environment = Environment(mode, prog_id, workspace.report, layout, native_dll);
     wil::unique_handle job(::CreateJobObjectW(nullptr, nullptr));
     THROW_LAST_ERROR_IF(job == nullptr);
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
@@ -182,14 +217,16 @@ Result Run(const association::Specification& request, Mode mode, std::wstring& t
         THROW_HR_IF(E_INVALIDARG, request.extension != L".pdf" || request.prog_id.empty());
         THROW_HR_IF(E_ACCESSDENIED, platform::IsProcessElevated());
         THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), !platform::Is64BitWindows() || !platform::GetWindowsVersion().IsWindows10OrGreater());
+        const auto layout = DetectHashLayout();
+        trace += L"hash_layout=" + std::wstring(HashLayoutName(layout)) + L"\n";
         if (mode != Mode::Check) {
-            if (Invoke(request.prog_id, L"preflight", trace) != 0)
+            if (Invoke(request.prog_id, L"preflight", layout, trace) != 0)
                 return {Status::Failed, L"MSBuild compatibility preflight failed; registration and default were not changed.", ERROR_REVISION_MISMATCH, false};
             if (mode == Mode::Preflight) return {Status::Success, L"MSBuild compatibility preflight passed; no writes were attempted.", 0, false};
             const auto registered = association::RegisterCandidate(request);
             if (registered.status == Status::Failed) return registered;
         }
-        const auto code = Invoke(request.prog_id, mode == Mode::Set ? L"set" : L"check", trace);
+        const auto code = Invoke(request.prog_id, mode == Mode::Set ? L"set" : L"check", layout, trace);
         if (code != 0) return {Status::Failed, L"MSBuild PDF task failed; see the failure stage in the report. Registration may already exist.", code, false};
         return VerifyShell(request, trace);
     } catch (const wil::ResultException& error) {

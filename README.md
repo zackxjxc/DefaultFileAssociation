@@ -9,6 +9,11 @@ it never requests elevation. If the process is already elevated, it exits with
 the message `请以普通用户权限启动此工具。` so that the association is not
 written into an unintended administrator profile.
 
+For some validated Windows 11 26H2 builds, the project has also found
+experimental ways to set default browser associations with **ordinary user
+permissions**. These methods remain research work, with no guarantee of stability
+or cross-build compatibility.
+
 ## Build
 
 The project uses C++23, CMake, and Visual Studio 2026 with the **v143 (VS 2022)**
@@ -177,21 +182,41 @@ to bypass administrator policy or impersonate another user.
 
 ## Current Windows 11 research status
 
-The EXE now embeds an explicit Framework64 MSBuild PDF backend and supports four
-additional selectable Windows host backends. Each backend performs compatibility
-preflight before candidate registration, sets the new-format record, and verifies
-its Hash plus the effective Shell handler. The default icon index is **1**.
+For some validated Windows 11 26H2 builds, the project has found several
+experimental ways to set default opening associations, including browser-related
+associations, with **ordinary user permissions**. These methods remain research
+work: stability, cross-build compatibility, and behavior under every system
+security policy are not guaranteed.
+
+The default-browser demonstration uses `--browser`; the name must match the
+browser's value name under `RegisteredApplications`, such as `Google Chrome`:
 
 ```powershell
-DefaultFileAssociation.exe --msbuild --preflight --ext=.pdf --prog-id=samplepdfreader.pdf
-DefaultFileAssociation.exe --msbuild --ext=.pdf --prog-id=samplepdfreader.pdf --exe-path="C:\Apps\SamplePdfReader.exe" --icon-index=1 --log-file=set.log
-DefaultFileAssociation.exe --msbuild --check --ext=.pdf --prog-id=samplepdfreader.pdf
+DefaultFileAssociation.exe --browser="Google Chrome" --dry-run
+DefaultFileAssociation.exe --browser="Google Chrome" --log-file=browser.log
+DefaultFileAssociation.exe --browser="Google Chrome" --check --log-file=browser-check.log
 ```
 
-This requires 64-bit Windows, Framework64 MSBuild, HashVersion 1, and one of two
-known system DLL fingerprints. Unknown builds fail before registration. The ISO
-profile is statically matched and still needs VM execution validation. The task
-is embedded, so no external project, Python, or Visual Studio is required at runtime.
+Browser mode reuses the installed browser's Capabilities and processes `http`,
+`https`, `.htm`, and `.html`; it does not require an EXE path, ProgID, or icon
+arguments. MSBuild and the four selectable host backends are PDF-only research
+routes and cannot be combined with `--browser`; they select the legacy or latest
+hash path from the machine's current UserChoice structure.
+
+The EXE also embeds an explicit Framework64 MSBuild PDF backend and supports four
+additional selectable Windows host backends. Each backend performs compatibility
+preflight before candidate registration, uses the legacy UserChoice hash or the
+validated UserChoiceLatest path as appropriate, and verifies its Hash plus the
+effective Shell handler. The default icon index is **1**.
+
+The latest-format PDF path requires 64-bit Windows and `HashVersion=1`. A known
+`windows.storage.dll` fingerprint uses the system helper; an unknown fingerprint
+falls back to the in-tree 26H2 independent implementation and validates the live
+`UserChoiceLatest` record before accepting a write. This fallback is experimental
+and is not guaranteed to match every serviced Windows build. Legacy UserChoice
+machines use the independent published legacy hash path and do not require
+`UserChoiceLatest`. The task is embedded, so no
+external project, Python, or Visual Studio is required at runtime.
 See the [portable VM test instructions](docs/msbuild-vm-test-package.md) and
 [three research directions](docs/default-association-research-roadmap.md).
 
@@ -208,9 +233,9 @@ The accepted backend names are `msbuild`, `installutil`, `regsvr32`, `odbcconf`,
 and `msiexec`; `--msbuild` remains an alias for `--backend=msbuild`. The four
 new modes load the managed or native host DLLs built beside the EXE. They are
 limited to PDF, the `DefaultFileAssociation-x64.exe` build, and non-elevated users;
-the x86 executable rejects these modes. Unknown system DLL
-fingerprints fail before registration, and a failed selected backend does not
-fall back to the legacy path.
+the x86 executable rejects these modes. Unknown system DLL fingerprints use the
+independent latest-format path, and a failed selected backend does not fall back
+to the legacy path.
 
 The legacy setting/check path does not implement `UserChoiceLatest`. A separate
 x64 `--latest-native-probe` can validate the new record on the exact researched
@@ -253,12 +278,22 @@ shape are both present. An OS build number alone is not enough.
 
 “Windows 11 26H2 UCPD 破解” is not a supported product claim. The tested
 profile is version-specific compatibility research. The current host build
-`26300.9711` has a read-only Hash validation profile in
-`research/scripts/check_latest_9711.py`, but the product intentionally refuses
-that new fingerprint for writes until a separate, normally authorized VM test
-establishes the complete behavior. The Framework64 MSBuild experiment therefore
-must not be described as a portable solution for the latest Windows 11 build.
-Unknown builds fail before internal addresses are called.
+`26300.9711` and the local 26H2 build have passed ordinary-user write validation;
+unknown DLLs do not cause an unverified internal address to be called, and the
+independent algorithm is attempted before the live record decides whether it is
+usable. This remains an experiment rather than a portable solution for every
+Windows 11 build.
+
+The independent `UserChoiceLatest` pipeline brace-normalizes the SQM `MachineId`,
+selects one of three tables from its final UTF-16 code unit, concatenates the
+extension, SID, ProgID, UTC FILETIME text, Microsoft seed, and MachineId in the
+table permutation, lowercases the text, runs the 26H2 variable-width/back-reference
+compressor, hashes the compressed UTF-16LE string including its NUL with MD5,
+feeds the first eight MD5 bytes into the two CS64 mixing chains, XORs their
+eight-byte outputs, and standard-Base64 encodes the result. MachineId is a Windows
+SQM telemetry identifier rather than a cryptographic device identity; cloning,
+reinstalling, or policy changes can change it and it should not be used as a
+long-term application identifier.
 
 ## Release packaging
 
@@ -293,10 +328,13 @@ are kept locally and excluded from Git.
   Explorer bookkeeping.
 * `src/user_choice.*` verifies and writes the versioned UserChoice hash, with
   the HTA fallback kept behind the same small interface.
+* `src/latest_hash_self.*` reads MachineId and implements the independent 26H2
+  UserChoiceLatest compressor and hash.
 * `src/result.h` is the shared association operation result.
 * `src/crypto/` wraps Windows CNG/crypt32 and contains the UserChoice hash
   implementation.
-* `tests/` contains crypto/UserChoice vectors and command-line/registry/association regression tests.
+* `tests/` contains legacy and independent UserChoiceLatest vectors plus command-line,
+  registry, association, and browser regression tests.
 
 The executable and tests link the same `dfa_core` static library. Registry
 integration tests use private keys; UserChoice and registration tests redirect

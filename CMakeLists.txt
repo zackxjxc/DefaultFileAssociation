@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.29)
 
 project(DefaultFileAssociation
-    VERSION 0.1.0
+    VERSION 0.1.3
     DESCRIPTION "Register a Windows file association for the current user"
     LANGUAGES CXX
 )
@@ -37,6 +37,7 @@ set(DFA_SOURCES
     src/diagnostics.cpp
     src/user_choice.cpp
     src/latest_native_probe.cpp
+    src/latest_hash_self.cpp
     src/msbuild_backend.cpp
     src/association_host_backend.cpp
     src/crypto/win_crypto.cpp
@@ -45,6 +46,9 @@ set(DFA_SOURCES
 )
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/msbuild_task.proj" DFA_MSBUILD_PROJECT)
+string(SUBSTRING "${DFA_MSBUILD_PROJECT}" 0 6000 DFA_MSBUILD_PROJECT_1)
+string(SUBSTRING "${DFA_MSBUILD_PROJECT}" 6000 6000 DFA_MSBUILD_PROJECT_2)
+string(SUBSTRING "${DFA_MSBUILD_PROJECT}" 12000 -1 DFA_MSBUILD_PROJECT_3)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/msbuild_task.proj")
 configure_file(src/msbuild_task_text.h.in "${CMAKE_CURRENT_BINARY_DIR}/generated/msbuild_task_text.h" @ONLY)
 add_library(dfa_core STATIC ${DFA_SOURCES})
@@ -179,13 +183,14 @@ if(BUILD_TESTING)
     add_executable(DefaultFileAssociationTests
         tests/user_choice_hash_tests.cpp
     )
+    add_executable(LatestHashSelfTests tests/latest_hash_self_tests.cpp)
     add_executable(CommandLineTests tests/command_line_tests.cpp)
     add_executable(RegistryTests tests/registry_tests.cpp)
     add_executable(UserChoiceTests tests/user_choice_tests.cpp)
     add_executable(AssociationTests tests/association_tests.cpp)
     add_executable(BrowserTests tests/browser_tests.cpp)
     # 所有测试复用同一份核心实现，避免测试与发布程序的编译配置发生偏差。
-    foreach(test_target IN ITEMS DefaultFileAssociationTests CommandLineTests RegistryTests
+    foreach(test_target IN ITEMS DefaultFileAssociationTests LatestHashSelfTests CommandLineTests RegistryTests
             UserChoiceTests AssociationTests BrowserTests)
         target_link_libraries(${test_target} PRIVATE dfa_core)
         if(MSVC)
